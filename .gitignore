@@ -134,3 +134,7 @@ data
 result
 .venv-cu11
 wandb
+
+
+# wikidata
+wikidata/
