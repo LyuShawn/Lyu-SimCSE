@@ -9,3 +9,4 @@ torch
 setuptools
 
 qwikidata
+spacy
