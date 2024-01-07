@@ -8,8 +8,8 @@ export CUDA_VISIBLE_DEVICES=2
 
 python train.py \
     --model_name_or_path bert-base-uncased \
-    --train_file data/wiki1m_for_simcse.txt \
-    --output_dir result/unsup-simcse-bert-base-test \
+    --train_file data/wiki1m_for_simcse_person_description.txt \
+    --output_dir result/unsup-simcse-bert-base-person_description \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
