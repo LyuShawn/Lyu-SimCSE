@@ -14,6 +14,7 @@ from transformers.file_utils import (
     add_start_docstrings_to_model_forward,
     replace_return_docstrings,
 )
+import time
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
 class MLPLayer(nn.Module):
@@ -162,7 +163,8 @@ def cl_forward(cls,
 
     # Separate representation
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
-
+    # z1: (bs, hidden), z2: (bs, hidden)
+    
     # Hard negative
     if num_sent == 3:
         z3 = pooler_output[:, 2]
@@ -195,21 +197,24 @@ def cl_forward(cls,
     # Hard negative
     if num_sent >= 3:
         z1_z3_cos = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
-        cos_sim = torch.cat([cos_sim, z1_z3_cos], 1)
+        #cos_sim = torch.cat([cos_sim, z1_z3_cos], 1)
 
     labels = torch.arange(cos_sim.size(0)).long().to(cls.device)
     loss_fct = nn.CrossEntropyLoss()
 
     # Calculate loss with hard negatives
-    if num_sent == 3:
-        # Note that weights are actually logits of weights
-        z3_weight = cls.model_args.hard_negative_weight
-        weights = torch.tensor(
-            [[0.0] * (cos_sim.size(-1) - z1_z3_cos.size(-1)) + [0.0] * i + [z3_weight] + [0.0] * (z1_z3_cos.size(-1) - i - 1) for i in range(z1_z3_cos.size(-1))]
-        ).to(cls.device)
-        cos_sim = cos_sim + weights
+    # if num_sent == 3:
+    #     # Note that weights are actually logits of weights
+    #     z3_weight = cls.model_args.hard_negative_weight
+    #     weights = torch.tensor(
+    #         [[0.0] * (cos_sim.size(-1) - z1_z3_cos.size(-1)) + [0.0] * i + [z3_weight] + [0.0] * (z1_z3_cos.size(-1) - i - 1) for i in range(z1_z3_cos.size(-1))]
+    #     ).to(cls.device)
+    #     cos_sim = cos_sim + weights # 按位相加
 
     loss = loss_fct(cos_sim, labels)
+
+    if num_sent == 3 and cls.model_args.test0_weight > 0:
+        loss = loss + cls.model_args.test0_weight * loss_fct(z1_z3_cos, labels)
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:

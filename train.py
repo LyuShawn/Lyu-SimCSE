@@ -7,11 +7,11 @@ from typing import Optional, Union, List, Dict, Tuple
 import torch
 import collections
 import random
-import time
 
 from datasets import load_dataset
 
 import transformers
+import time
 from transformers import (
     CONFIG_MAPPING,
     MODEL_FOR_MASKED_LM_MAPPING,
@@ -124,6 +124,13 @@ class ModelArguments:
         }
     )
 
+    # Lyu's arguments
+    test0_weight: float = field(
+        default=0.0,
+        metadata={
+            "help": "Weight for test0."
+        }
+    )
 
 @dataclass
 class DataTrainingArguments:
@@ -257,6 +264,7 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
 
     if (
         os.path.exists(training_args.output_dir)

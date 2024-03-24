@@ -10,7 +10,7 @@
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/14 \
+    --output_dir result/22 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -27,13 +27,13 @@ python train.py \
     --do_eval \
     --test0_weight 1e-3 \
     --fp16 \
-    --seed 579 \
+    --seed 3407 \
     "$@"
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/15 \
+    --output_dir result/23 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -50,13 +50,13 @@ python train.py \
     --do_eval \
     --test0_weight 5e-3 \
     --fp16 \
-    --seed 579 \
+    --seed 3407 \
     "$@"
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/16 \
+    --output_dir result/24 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -73,13 +73,13 @@ python train.py \
     --do_eval \
     --test0_weight 1e-2 \
     --fp16 \
-    --seed 579 \
+    --seed 3407 \
     "$@"
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/17 \
+    --output_dir result/25 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -96,13 +96,13 @@ python train.py \
     --do_eval \
     --test0_weight 5e-2 \
     --fp16 \
-    --seed 579 \
+    --seed 3407 \
     "$@"
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/18 \
+    --output_dir result/26 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -117,15 +117,15 @@ python train.py \
     --temp 0.05 \
     --do_train \
     --do_eval \
-    --test0_weight 1e-1 \
+    --test0_weight 1e-3 \
     --fp16 \
-    --seed 579 \
+    --seed 10221 \
     "$@"
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/19 \
+    --output_dir result/27 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -140,15 +140,15 @@ python train.py \
     --temp 0.05 \
     --do_train \
     --do_eval \
-    --test0_weight 5e-1 \
+    --test0_weight 5e-3 \
     --fp16 \
-    --seed 579 \
+    --seed 10221 \
     "$@"
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/20 \
+    --output_dir result/28 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -163,15 +163,16 @@ python train.py \
     --temp 0.05 \
     --do_train \
     --do_eval \
-    --test0_weight 1 \
+    --test0_weight 1e-2 \
     --fp16 \
-    --seed 579 \
+    --seed 10221 \
     "$@"
+
 
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/simcse_(origin_origin_person).csv' \
-    --output_dir result/21 \
+    --output_dir result/29 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -186,7 +187,8 @@ python train.py \
     --temp 0.05 \
     --do_train \
     --do_eval \
-    --test0_weight 1e-4 \
+    --test0_weight 5e-2 \
     --fp16 \
-    --seed 579 \
+    --seed 10221 \
     "$@"
+

@@ -7,6 +7,3 @@ prettytable
 gradio
 torch
 setuptools
-
-qwikidata
-spacy
