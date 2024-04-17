@@ -7,3 +7,5 @@ prettytable
 gradio
 torch
 setuptools
+elasticsearch
+mysql-connector-python
