@@ -37,6 +37,7 @@ from transformers.data.data_collator import DataCollatorForLanguageModeling
 from transformers.file_utils import cached_property, torch_required, is_torch_available, is_torch_tpu_available
 from simcse.models import RobertaForCL, BertForCL
 from simcse.trainers import CLTrainer
+from auto_eval import eval_exp
 
 logger = logging.getLogger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
@@ -315,9 +316,9 @@ def main():
     if extension == "txt":
         extension = "text"
     if extension == "csv":
-        datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/", delimiter="\t" if "tsv" in data_args.train_file else ",")
+        datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/", delimiter="\t" if "tsv" in data_args.train_file else ",")
     else:
-        datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/")
+        datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/")
 
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
@@ -574,16 +575,7 @@ def main():
     results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-        results = trainer.evaluate(eval_senteval_transfer=True)
-
-        output_eval_file = os.path.join(training_args.output_dir, "eval_results.txt")
-        if trainer.is_world_process_zero():
-            with open(output_eval_file, "w") as writer:
-                logger.info("***** Eval results *****")
-                for key, value in sorted(results.items()):
-                    logger.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
-
+        results = eval_exp(training_args.output_dir)
     return results
 
 def _mp_fn(index):
