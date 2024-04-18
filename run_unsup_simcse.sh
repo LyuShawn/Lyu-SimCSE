@@ -9,7 +9,7 @@ export CUDA_VISIBLE_DEVICES=2
 python train.py \
     --model_name_or_path bert-base-uncased \
     --train_file 'data/wiki1m_for_simcse.txt' \
-    --output_dir result/test \
+    --output_dir result/27 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
@@ -24,7 +24,7 @@ python train.py \
     --temp 0.05 \
     --do_train \
     --do_eval \
-    --test0_weight 1e-2 \
     --fp16 \
-    --seed 579 \
+    --mask_embedding_sentence \
+    --mask_embedding_sentence_autoprompt \
     "$@"

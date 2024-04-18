@@ -132,7 +132,45 @@ class ModelArguments:
             "help": "Weight for test0."
         }
     )
+    mask_embedding_sentence: bool = field(
+        default=False,
+        metadata={
+        }
+    )
+    mask_embedding_sentence_template: str = field(
+        default='*cls*_This_sentence_:_\'*sent_0*\'_means*mask*.*sep+*',
+        metadata={
+            "help": "The template for mask embedding sentence."
+        }
+    )
 
+    mask_embedding_sentence_bs: str = field(
+        default='This sentence of "',
+        metadata={
+        }
+    )
+    mask_embedding_sentence_es: str = field(
+        default='" means [MASK].',
+        metadata={
+        }
+    )
+    
+    mask_embedding_sentence_autoprompt: bool = field(
+        default=False,
+        metadata={
+        }
+    )
+
+    mask_embedding_sentence_different_template: str= field(
+        default='',
+        metadata={
+        }
+    )
+    mask_embedding_sentence_autoprompt_freeze_prompt: bool = field(
+        default=False,
+        metadata={
+        }
+    )
 @dataclass
 class DataTrainingArguments:
     """
@@ -408,6 +446,23 @@ def main():
         sent1_cname = column_names[0]
     else:
         raise NotImplementedError
+    
+    # use prompt template
+    if model_args.mask_embedding_sentence:
+        if model_args.mask_embedding_sentence_template !='':
+            template = model_args.mask_embedding_sentence_template
+            assert ' ' not in template, 'template should not contain space'
+            template = template.replace('*mask*', tokenizer.mask_token)\
+                               .replace('*sep+*', '')\
+                               .replace('*cls*', '')\
+                               .replace('*sent_0*', ' ')
+            template = template.split(' ')
+            model_args.mask_embedding_sentence_bs = template[0].replace('_', ' ')
+            
+            if 'roberta' in model_args.model_name_or_path:
+                # remove empty block
+                model_args.mask_embedding_sentence_bs = model_args.mask_embedding_sentence_bs.strip()
+            model_args.mask_embedding_sentence_es = template[1].replace('_', ' ')
 
     def prepare_features(examples):
         # padding = longest (default)
@@ -435,12 +490,40 @@ def main():
                     examples[sent2_cname][idx] = " "
             sentences += examples[sent2_cname]
 
-        sent_features = tokenizer(
-            sentences,
-            max_length=data_args.max_seq_length,
-            truncation=True,
-            padding="max_length" if data_args.pad_to_max_length else False,
-        )
+        if model_args.mask_embedding_sentence:
+            bs = tokenizer.encode(model_args.mask_embedding_sentence_bs)[:-1]
+            es = tokenizer.encode(model_args.mask_embedding_sentence_es)[1:] # remove cls or bos
+
+            if len(model_args.mask_embedding_sentence_different_template) > 0:
+                bs2 = tokenizer.encode(model_args.mask_embedding_sentence_bs2)[:-1]
+                es2 = tokenizer.encode(model_args.mask_embedding_sentence_es2)[1:] # remove cls or bos
+            else:
+                bs2, es2 = bs, es
+
+            sent_features = {'input_ids': [], 'attention_mask': []}
+            for i, s in enumerate(sentences):
+                if i < total:
+                    s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                    sent_features['input_ids'].append(bs+s+es)
+                elif i < 2*total:
+                    s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                    sent_features['input_ids'].append(bs2+s+es2)
+                else:
+                    s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                    sent_features['input_ids'].append(bs2+s+es2)
+
+            ml = max([len(i) for i in sent_features['input_ids']])
+            for i in range(len(sent_features['input_ids'])):
+                t = sent_features['input_ids'][i]
+                sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
+                sent_features['attention_mask'].append(len(t)*[1] + (ml-len(t))*[0])
+        else:
+            sent_features = tokenizer(
+                sentences,
+                max_length=data_args.max_seq_length,
+                truncation=True,
+                padding="max_length" if data_args.pad_to_max_length else False,
+            )
 
         features = {}
         if sent2_cname is not None:
@@ -540,6 +623,45 @@ def main():
             return inputs, labels
 
     data_collator = default_data_collator if data_args.pad_to_max_length else OurDataCollatorWithPadding(tokenizer)
+
+    if model_args.mask_embedding_sentence:
+        model.mask_token_id = tokenizer.mask_token_id
+        model.pad_token_id = tokenizer.pad_token_id
+        model.bos = tokenizer.encode('')[0]
+        model.eos = tokenizer.encode('')[1]
+        model.bs = tokenizer.encode(model_args.mask_embedding_sentence_bs, add_special_tokens=False)
+        model.es = tokenizer.encode(model_args.mask_embedding_sentence_es, add_special_tokens=False)
+
+        model.mask_embedding_template = tokenizer.encode(model_args.mask_embedding_sentence_bs + model_args.mask_embedding_sentence_es)
+
+        print('template bs', model.bs)
+        print('template es', model.es)
+        print('template mask_embedding_template', tokenizer.decode(model.mask_embedding_template))
+        print('template mask_embedding_template', model.mask_embedding_template)
+
+        assert len(model.mask_embedding_template) == len(model.bs) + len(model.es) + 2
+        assert model.mask_embedding_template[1:-1] == model.bs + model.es
+
+        if len(model_args.mask_embedding_sentence_different_template) > 0:
+            model.mask_embedding_template2 = tokenizer.encode(model_args.mask_embedding_sentence_bs2 + \
+                                                              model_args.mask_embedding_sentence_es2)
+            print('d template mask_embedding_template', tokenizer.decode(model.mask_embedding_template2))
+            print('d template mask_embedding_template', model.mask_embedding_template2)
+
+        if model_args.mask_embedding_sentence_autoprompt:
+            mask_index = model.mask_embedding_template.index(tokenizer.mask_token_id)
+            index_mbv = model.mask_embedding_template[1:mask_index] + model.mask_embedding_template[mask_index+1:-1]
+
+            model.dict_mbv = index_mbv
+            model.fl_mbv = [i <= 3 for i, k in enumerate(index_mbv)]
+            
+            p_mbv_w = model.bert.embeddings.word_embeddings.weight[model.dict_mbv].clone()
+            model.register_parameter(name='p_mbv', param=torch.nn.Parameter(p_mbv_w))
+            if model_args.mask_embedding_sentence_autoprompt_freeze_prompt:
+                model.p_mbv.requires_grad = False
+
+            if model_args.mask_embedding_sentence_autoprompt_random_init:
+                model.p_mbv.data.normal_(mean=0.0, std=0.02)
 
     trainer = CLTrainer(
         model=model,
