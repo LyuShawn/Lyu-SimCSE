@@ -5,14 +5,12 @@ from prettytable import PrettyTable
 import torch
 from transformers import AutoModel, AutoTokenizer
 import json
-import senteval
-
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
-
-# Import SentEval
 sys.path.insert(0, PATH_TO_SENTEVAL)
+
+import senteval
 
 def print_table(task_names, scores):
     tb = PrettyTable()
@@ -201,8 +199,6 @@ def calculate_average(task_scores):
         avg_scores[task] = sum(task_scores[task]) / len(task_scores[task])
     return avg_scores
 
-
-
 def eval_exp(path,times=3,pooler = 'cls',task_set = 'sts',mode = 'test'):
     print (f'start evaluation {path},with times={times},pooler={pooler},task_set={task_set},mode={mode}')
     task_scores = {'STS12': [], 'STS13': [], 'STS14': [], 'STS15': [], 'STS16': [], 'STSBenchmark': [], 'SICKRelatedness': [],'avg':[]}
@@ -215,3 +211,10 @@ def eval_exp(path,times=3,pooler = 'cls',task_set = 'sts',mode = 'test'):
         json.dump(scores,f, indent=4, sort_keys=True)
     print('done')
     return scores
+
+# def main():
+#     model_name_or_path = 'result/28'
+#     eval_exp(model_name_or_path)
+
+# if __name__ == '__main__':
+#     main()
