@@ -1,3 +1,4 @@
+# simcse
 transformers==4.2.1
 scipy
 datasets
@@ -7,6 +8,5 @@ prettytable
 gradio
 torch
 setuptools
-elasticsearch
-mysql-connector-python
-spacy
+
+# lyu

@@ -7,7 +7,7 @@ from typing import Optional, Union, List, Dict, Tuple
 import torch
 import collections
 import random
-from auto_eval import eval_exp
+from eval import eval_exp
 
 from datasets import load_dataset
 
@@ -366,7 +366,6 @@ def main():
     # Evaluation
     results = {}
     if training_args.do_eval:
-        logger.info("*** Evaluate ***")
         results = eval_exp(training_args.output_dir)
     return results
 

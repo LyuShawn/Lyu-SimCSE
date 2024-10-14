@@ -28,4 +28,4 @@
 #     --seed 579 \
 #     "$@"
 
-python train.py --output_dir result/33
+python train.py --output_dir result/34
