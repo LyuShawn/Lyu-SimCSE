@@ -201,6 +201,15 @@ def main():
     else:
         raise NotImplementedError
 
+    if model_args.do_prompt:
+        template = model_args.prompt_template
+        template = template.replace('*mask*', tokenizer.mask_token)\
+                    .replace('*sep+*', '')\
+                    .replace('*cls*', '').replace('*sent_0*', ' ')
+        template = template.split(' ')
+        model_args.mask_embedding_sentence_bs = template[0].replace('_', ' ')
+        model_args.mask_embedding_sentence_es = template[1].replace('_', ' ')
+
     def get_prompt_sentence(sentence:str):
         if not model_args.do_prompt:
             raise Exception("Prompt is not enabled.")
@@ -226,9 +235,9 @@ def main():
             if examples[sent1_cname][idx] is None:
                 examples[sent1_cname][idx] = " "
 
-        if model_args.do_prompt:
-            for idx in range(total):
-                examples[sent0_cname][idx] = get_prompt_sentence(examples[sent0_cname][idx])
+        # if model_args.do_prompt:
+        #     for idx in range(total):
+        #         examples[sent0_cname][idx] = get_prompt_sentence(examples[sent0_cname][idx])
 
         sentences = examples[sent0_cname] + examples[sent1_cname]
 
@@ -239,12 +248,34 @@ def main():
                     examples[sent2_cname][idx] = " "
             sentences += examples[sent2_cname]
 
-        sent_features = tokenizer(
-            sentences,
-            max_length=data_args.max_seq_length,
-            truncation=True,
-            padding="max_length" if data_args.pad_to_max_length else False,
-        )
+        if model_args.do_prompt:
+            bs = tokenizer.encode(model_args.mask_embedding_sentence_bs)[:-1]
+            es = tokenizer.encode(model_args.mask_embedding_sentence_es)[1:] # remove cls or bos
+            bs2, es2 = bs, es
+            sent_features = {'input_ids': [], 'attention_mask': []}
+            for i, s in enumerate(sentences):
+                if i < total:
+                    s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                    sent_features['input_ids'].append(bs+s+es)
+                elif i < 2*total:
+                    s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                    sent_features['input_ids'].append(bs2+s+es2)
+                else:
+                    s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                    sent_features['input_ids'].append(bs2+s+es2)
+
+            ml = max([len(i) for i in sent_features['input_ids']])
+            for i in range(len(sent_features['input_ids'])):
+                t = sent_features['input_ids'][i]
+                sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
+                sent_features['attention_mask'].append(len(t)*[1] + (ml-len(t))*[0])
+        else:
+            sent_features = tokenizer(
+                sentences,
+                max_length=data_args.max_seq_length,
+                truncation=True,
+                padding="max_length" if data_args.pad_to_max_length else False,
+            )
 
         features = {}
         if sent2_cname is not None:
@@ -262,7 +293,7 @@ def main():
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file= False # not data_args.overwrite_cache,
+            load_from_cache_file= not data_args.overwrite_cache,
         )
 
     # Data collator

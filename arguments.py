@@ -105,7 +105,7 @@ class ModelArguments:
     )
 
     prompt_template: str = field(
-        default='This sentence : "{sentence}" means [MASK].',
+        default="*cls*_This_sentence_:_\"*sent_0*\"_means*mask*.*sep+*",
         metadata={
             "help": "Prompt template for prompt auxiliary objective (only effective if --do_prompt)."
         }
@@ -240,7 +240,7 @@ class OurTrainingArguments(TrainingArguments):
     )
     
     seed: int = field(
-        default=579, 
+        default=42, 
         metadata={"help": "random seed for initialization"}
     )
     
