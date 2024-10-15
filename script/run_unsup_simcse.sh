@@ -28,4 +28,5 @@
 #     --seed 579 \
 #     "$@"
 
-python train.py --output_dir result/34
+python train.py --output_dir result/40
+python train.py --output_dir result/41 --do_prompt

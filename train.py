@@ -7,7 +7,7 @@ from typing import Optional, Union, List, Dict, Tuple
 import torch
 import collections
 import random
-from eval import eval_exp
+from eval import eval
 
 from datasets import load_dataset
 
@@ -201,6 +201,14 @@ def main():
     else:
         raise NotImplementedError
 
+    def get_prompt_sentence(sentence:str):
+        if not model_args.do_prompt:
+            raise Exception("Prompt is not enabled.")
+
+        template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
+
+        return template.format(sentence = sentence)
+
     def prepare_features(examples):
         # padding = longest (default)
         #   If no sentence in the batch exceed the max length, then use
@@ -211,13 +219,17 @@ def main():
         #   All sentences are padded/truncated to data_args.max_seq_length.
         total = len(examples[sent0_cname])
 
-        # Avoid "None" fields 
+        # Avoid "None" fields
         for idx in range(total):
             if examples[sent0_cname][idx] is None:
                 examples[sent0_cname][idx] = " "
             if examples[sent1_cname][idx] is None:
                 examples[sent1_cname][idx] = " "
-        
+
+        if model_args.do_prompt:
+            for idx in range(total):
+                examples[sent0_cname][idx] = get_prompt_sentence(examples[sent0_cname][idx])
+
         sentences = examples[sent0_cname] + examples[sent1_cname]
 
         # If hard negative exists
@@ -250,7 +262,7 @@ def main():
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
+            load_from_cache_file= False # not data_args.overwrite_cache,
         )
 
     # Data collator
@@ -333,6 +345,9 @@ def main():
 
     data_collator = default_data_collator if data_args.pad_to_max_length else OurDataCollatorWithPadding(tokenizer)
 
+    if model_args.do_prompt:
+        model.mask_token_id = tokenizer.mask_token_id
+
     trainer = CLTrainer(
         model=model,
         args=training_args,
@@ -366,7 +381,7 @@ def main():
     # Evaluation
     results = {}
     if training_args.do_eval:
-        results = eval_exp(training_args.output_dir)
+        results = eval(training_args.output_dir)
     return results
 
 def _mp_fn(index):

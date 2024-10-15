@@ -97,6 +97,20 @@ class ModelArguments:
         }
     )
 
+    do_prompt: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use prompt auxiliary objective."
+        }
+    )
+
+    prompt_template: str = field(
+        default='This sentence : "{sentence}" means [MASK].',
+        metadata={
+            "help": "Prompt template for prompt auxiliary objective (only effective if --do_prompt)."
+        }
+    )
+
 
 @dataclass
 class DataTrainingArguments:
@@ -231,12 +245,12 @@ class OurTrainingArguments(TrainingArguments):
     )
     
     do_train: bool = field(
-        default=True, 
+        default=False, 
         metadata={"help": "Whether to run training."}
     )
     
     do_eval: bool = field(
-        default=True, 
+        default=False, 
         metadata={"help": "Whether to run eval on the dev set."}
     )
     @cached_property

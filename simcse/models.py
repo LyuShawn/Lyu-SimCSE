@@ -152,7 +152,12 @@ def cl_forward(cls,
         )
 
     # Pooling
-    pooler_output = cls.pooler(attention_mask, outputs)
+
+    if cls.model_args.do_prompt:
+        last_hidden = outputs.last_hidden_state
+        pooler_output = last_hidden[input_ids == cls.mask_token_id]
+    else:
+        pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
     # If using "cls", we add an extra MLP layer
