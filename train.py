@@ -381,6 +381,7 @@ def main():
     # Evaluation
     results = {}
     if training_args.do_eval:
+        logger.info("*** Evaluate ***")
         results = eval(training_args.output_dir)
     return results
 

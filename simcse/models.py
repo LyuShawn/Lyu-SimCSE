@@ -156,14 +156,18 @@ def cl_forward(cls,
     if cls.model_args.do_prompt:
         last_hidden = outputs.last_hidden_state
         pooler_output = last_hidden[input_ids == cls.mask_token_id]
+        pooler_output = pooler_output.view(batch_size * num_sent, -1)
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
     # If using "cls", we add an extra MLP layer
     # (same as BERT's original implementation) over the representation.
-    if cls.pooler_type == "cls":
-        pooler_output = cls.mlp(pooler_output)
+    if cls.model_args.do_prompt:
+        pass
+    else:
+        if cls.pooler_type == "cls":
+            pooler_output = cls.mlp(pooler_output)
 
     # Separate representation
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
