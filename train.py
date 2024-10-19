@@ -133,6 +133,9 @@ def main():
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
 
+    config.hidden_dropout_prob=model_args.dropout
+    config.attention_probs_dropout_prob=model_args.dropout
+
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
         "use_fast": model_args.use_fast_tokenizer,

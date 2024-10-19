@@ -111,6 +111,14 @@ class ModelArguments:
         }
     )
 
+    dropout: float = field(
+        default=0.1,
+        metadata={
+            "help": "Whether to use MLM auxiliary objective."
+        }
+    )
+
+
 
 @dataclass
 class DataTrainingArguments:
