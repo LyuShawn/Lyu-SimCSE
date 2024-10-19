@@ -1,4 +1,3 @@
-import logging
 from dataclasses import dataclass, field
 from typing import Optional
 import torch
@@ -8,9 +7,11 @@ from transformers import (
     TrainingArguments,
 )
 
-from transformers.file_utils import cached_property, torch_required, is_torch_tpu_available
+from transformers.utils import is_torch_tpu_available,cached_property
+import logging
 
 logger = logging.getLogger(__name__)
+
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
@@ -119,7 +120,6 @@ class ModelArguments:
     )
 
 
-
 @dataclass
 class DataTrainingArguments:
     """
@@ -143,7 +143,7 @@ class DataTrainingArguments:
         },
     )
     preprocessing_num_workers: Optional[int] = field(
-        default=None,
+        default=8,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
 
@@ -261,8 +261,12 @@ class OurTrainingArguments(TrainingArguments):
         default=False, 
         metadata={"help": "Whether to run eval on the dev set."}
     )
+
+    distributed_state: Optional[str] = field(
+        default=None,
+    )
+
     @cached_property
-    @torch_required
     def _setup_devices(self) -> "torch.device":
         logger.info("PyTorch: setting up devices")
         if self.no_cuda:

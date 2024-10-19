@@ -1,5 +1,5 @@
 # simcse
-transformers==4.2.1
+transformers
 scipy
 datasets
 pandas
@@ -8,5 +8,4 @@ prettytable
 gradio
 torch
 setuptools
-
-# lyu
+numpy==1.23.5
