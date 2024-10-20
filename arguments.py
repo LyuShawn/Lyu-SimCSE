@@ -211,7 +211,7 @@ class OurTrainingArguments(TrainingArguments):
     )
     
     # 评估策略
-    evaluation_strategy: str = field(
+    eval_strategy: str = field(
         default="steps",
         metadata={"help": "The evaluation strategy to use."},
     )

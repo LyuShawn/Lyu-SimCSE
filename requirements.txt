@@ -9,3 +9,4 @@ gradio
 torch
 setuptools
 numpy==1.23.5
+accelerate>=0.26.0
