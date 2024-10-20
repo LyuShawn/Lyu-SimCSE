@@ -7,14 +7,12 @@ from transformers.utils import logging
 import torch
 from typing import Dict, List, Optional
 from torch.utils.data.dataset import Dataset
+from torch.amp import autocast
 
-# Set path to SentEval
-PATH_TO_SENTEVAL = "./SentEval"
+
 PATH_TO_DATA = "./SentEval/data"
 
-# Import SentEval
-sys.path.insert(0, PATH_TO_SENTEVAL)
-import senteval
+import SentEval.senteval as senteval
 
 logger = logging.get_logger(__name__)
 
@@ -39,18 +37,18 @@ class CLTrainer(Trainer):
 
         def batcher(params, batch):
             sentences = [" ".join(s) for s in batch]
-            batch = self.tokenizer.batch_encode_plus(
+            batch = self.tokenizer(
                 sentences,
                 return_tensors="pt",
                 padding=True,
-            )
-            for k in batch:
-                batch[k] = batch[k].to(self.args.device)
+            ).to(self.args.device)
+
             with torch.no_grad():
-                outputs = self.model(
-                    **batch, output_hidden_states=True, return_dict=True, sent_emb=True
-                )
-                pooler_output = outputs.pooler_output
+                with autocast(device_type=self.args.device.type):
+                    outputs = self.model(
+                        **batch, output_hidden_states=True, return_dict=True, sent_emb=True
+                    )
+                    pooler_output = outputs.pooler_output
             return pooler_output.cpu()
 
         # Set params for SentEval (fastmode)

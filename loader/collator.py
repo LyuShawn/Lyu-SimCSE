@@ -19,10 +19,12 @@ class OurDataCollatorWithPadding:
     def __call__(self, features: List[Dict[str, Union[List[int], List[List[int]], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         special_keys = ['input_ids', 'attention_mask', 'token_type_ids', 'mlm_input_ids', 'mlm_labels']
         bs = len(features)
+
         if bs > 0:
             num_sent = len(features[0]['input_ids'])
         else:
             return
+
         flat_features = []
         for feature in features:
             for i in range(num_sent):
@@ -38,7 +40,9 @@ class OurDataCollatorWithPadding:
         if self.do_mlm:
             batch["mlm_input_ids"], batch["mlm_labels"] = self.mask_tokens(batch["input_ids"])
 
-        batch = {k: batch[k].view(bs, num_sent, -1) if k in special_keys else batch[k].view(bs, num_sent, -1)[:, 0] for k in batch}
+        for k in special_keys:
+            if k in batch:
+                batch[k] = batch[k].view(bs, num_sent, -1)
 
         if "label" in batch:
             batch["labels"] = batch["label"]

@@ -27,10 +27,3 @@
 #     --fp16 \
 #     --seed 579 \
 #     "$@"
-
-tsp python train.py --output_dir result/40 --do_eval
-tsp python train.py --output_dir ~/autodl-tmp/simcse-result/41 --do_prompt --do_train --do_eval
-tsp python train.py --output_dir ~/autodl-tmp/simcse-result/42 --do_prompt --do_train --do_eval --max_seq_length 64
-tsp python train.py --output_dir ~/autodl-tmp/simcse-result/43 --do_prompt --do_train --do_eval --per_device_train_batch_size 64
-tsp python train.py --output_dir ~/autodl-tmp/simcse-result/44 --do_prompt --do_train --do_eval --seed 1029
-tsp python train.py --output_dir ~/autodl-tmp/simcse-result/45 --do_prompt --do_train --do_eval --seed 10221
