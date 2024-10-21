@@ -154,12 +154,24 @@ def main():
 
     if model_args.mask_embedding_sentence:
         template = model_args.mask_embedding_sentence_template
+        assert ' ' not in template
         template = template.replace('*mask*', tokenizer.mask_token)\
                     .replace('*sep+*', '')\
                     .replace('*cls*', '').replace('*sent_0*', ' ')
         template = template.split(' ')
         model_args.mask_embedding_sentence_bs = template[0].replace('_', ' ')
         model_args.mask_embedding_sentence_es = template[1].replace('_', ' ')
+
+        if model_args.mask_embedding_sentence_different_template:
+            template = model_args.mask_embedding_sentence_different_template
+            assert ' ' not in template
+            template = template.replace('*mask*', tokenizer.mask_token)\
+                    .replace('*sep+*', '')\
+                    .replace('*cls*', '').replace('*sent_0*', ' ')
+            template = template.split(' ')
+            model_args.mask_embedding_sentence_bs2 = template[0].replace('_', ' ')
+            model_args.mask_embedding_sentence_es2 = template[1].replace('_', ' ')
+                            
 
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,
@@ -205,6 +217,12 @@ def main():
 
         assert len(model.mask_embedding_template) == len(model.bs) + len(model.es) + 2
         assert model.mask_embedding_template[1:-1] == model.bs + model.es
+
+        if model_args.mask_embedding_sentence_different_template:
+            model.mask_embedding_template2 = tokenizer.encode(model_args.mask_embedding_sentence_bs2 + \
+                                                              model_args.mask_embedding_sentence_es2)
+            print('d template mask_embedding_template', tokenizer.decode(model.mask_embedding_template2))
+            print('d template mask_embedding_template', model.mask_embedding_template2)
 
     trainer = CLTrainer(
         model=model,

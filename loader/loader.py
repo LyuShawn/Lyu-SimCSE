@@ -42,18 +42,26 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         bs = tokenizer.encode(model_args.mask_embedding_sentence_bs)[:-1]
         es = tokenizer.encode(model_args.mask_embedding_sentence_es)[1:] # remove cls or bos
 
-        bs2, es2 = bs, es
+        if model_args.mask_embedding_sentence_different_template:
+            bs2 = tokenizer.encode(model_args.mask_embedding_sentence_different_template)[:-1]
+            es2 = tokenizer.encode(model_args.mask_embedding_sentence_different_template)[1:]
+        else:
+            bs2, es2 = bs, es
+
         sent_features = {'input_ids': [], 'attention_mask': []}
         for i, s in enumerate(sentences):
+            if len(s) > 500:
+                length = len(s)
+                a= 1
             if i < total:
                 # 这里做了最大句子长度的截断
-                s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                s = tokenizer.encode(s, add_special_tokens=False,max_length=data_args.max_seq_length,truncation=True)
                 sent_features['input_ids'].append(bs+s+es)
             elif i < 2*total:
-                s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                s = tokenizer.encode(s, add_special_tokens=False,max_length=data_args.max_seq_length,truncation=True)
                 sent_features['input_ids'].append(bs2+s+es2)
             else:
-                s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+                s = tokenizer.encode(s, add_special_tokens=False,max_length=data_args.max_seq_length,truncation=True)
                 sent_features['input_ids'].append(bs2+s+es2)
         # 计算最大序列长度
         ml = max([len(i) for i in sent_features['input_ids']])
