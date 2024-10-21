@@ -98,14 +98,14 @@ class ModelArguments:
         }
     )
 
-    do_prompt: bool = field(
+    mask_embedding_sentence: bool = field(
         default=False,
         metadata={
-            "help": "Whether to use prompt auxiliary objective."
+            "help": "Whether to use mask embedding sentence."
         }
     )
 
-    prompt_template: str = field(
+    mask_embedding_sentence_template: str = field(
         default="*cls*_This_sentence_:_\"*sent_0*\"_means*mask*.*sep+*",
         metadata={
             "help": "Prompt template for prompt auxiliary objective (only effective if --do_prompt)."

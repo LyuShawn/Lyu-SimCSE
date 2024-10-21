@@ -153,7 +153,7 @@ def cl_forward(cls,
 
     # Pooling
 
-    if cls.model_args.do_prompt:
+    if cls.model_args.mask_embedding_sentence:
         last_hidden = outputs.last_hidden_state
         pooler_output = last_hidden[input_ids == cls.mask_token_id]
         pooler_output = pooler_output.view(batch_size * num_sent, -1)
@@ -163,7 +163,7 @@ def cl_forward(cls,
 
     # If using "cls", we add an extra MLP layer
     # (same as BERT's original implementation) over the representation.
-    if cls.model_args.do_prompt:
+    if cls.model_args.mask_embedding_sentence:
         pass
     else:
         if cls.pooler_type == "cls":

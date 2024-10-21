@@ -23,9 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    # See all possible arguments in src/transformers/training_args.py
-    # or by passing the --help flag to this script.
-    # We now keep distinct sets of args, for a cleaner separation of concerns.
 
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, OurTrainingArguments))
 
@@ -155,14 +152,14 @@ def main():
     else:
         raise NotImplementedError
 
-    # if model_args.do_prompt:
-    #     template = model_args.prompt_template
-    #     template = template.replace('*mask*', tokenizer.mask_token)\
-    #                 .replace('*sep+*', '')\
-    #                 .replace('*cls*', '').replace('*sent_0*', ' ')
-    #     template = template.split(' ')
-    #     model_args.mask_embedding_sentence_bs = template[0].replace('_', ' ')
-    #     model_args.mask_embedding_sentence_es = template[1].replace('_', ' ')
+    if model_args.mask_embedding_sentence:
+        template = model_args.mask_embedding_sentence_template
+        template = template.replace('*mask*', tokenizer.mask_token)\
+                    .replace('*sep+*', '')\
+                    .replace('*cls*', '').replace('*sent_0*', ' ')
+        template = template.split(' ')
+        model_args.mask_embedding_sentence_bs = template[0].replace('_', ' ')
+        model_args.mask_embedding_sentence_es = template[1].replace('_', ' ')
 
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,
@@ -190,6 +187,24 @@ def main():
     else:
         # 否则使用自定义的collator，传入tokenizer
         data_collator = OurDataCollatorWithPadding(tokenizer=tokenizer, mlm_probability=data_args.mlm_probability, do_mlm=model_args.do_mlm)
+
+    if model_args.mask_embedding_sentence:
+        model.mask_token_id = tokenizer.mask_token_id
+        model.pad_token_id = tokenizer.pad_token_id
+        model.bos = tokenizer.encode('')[0]
+        model.eos = tokenizer.encode('')[1]
+        model.bs = tokenizer.encode(model_args.mask_embedding_sentence_bs, add_special_tokens=False)
+        model.es = tokenizer.encode(model_args.mask_embedding_sentence_es, add_special_tokens=False)
+
+        model.mask_embedding_template = tokenizer.encode(model_args.mask_embedding_sentence_bs + model_args.mask_embedding_sentence_es)
+
+        logger.info('template bs: %s', model.bs)
+        logger.info('template es: %s', model.es)
+        logger.info('template mask_embedding_template: %s', tokenizer.decode(model.mask_embedding_template))
+        logger.info('template mask_embedding_template: %s', model.mask_embedding_template)
+
+        assert len(model.mask_embedding_template) == len(model.bs) + len(model.es) + 2
+        assert model.mask_embedding_template[1:-1] == model.bs + model.es
 
     trainer = CLTrainer(
         model=model,
