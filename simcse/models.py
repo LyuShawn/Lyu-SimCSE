@@ -155,21 +155,11 @@ def cl_forward(cls,
 
     # Pooling
 
-    if cls.model_args.mask_embedding_sentence:
-        last_hidden = outputs.last_hidden_state
-        pooler_output = last_hidden[input_ids == cls.mask_token_id]
-        pooler_output = pooler_output.view(batch_size * num_sent, -1)
-    else:
-        pooler_output = cls.pooler(attention_mask, outputs)
+    pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
-    # If using "cls", we add an extra MLP layer
-    # (same as BERT's original implementation) over the representation.
-    if cls.model_args.mask_embedding_sentence:
-        pass
-    else:
-        if cls.pooler_type == "cls":
-            pooler_output = cls.mlp(pooler_output)
+    if cls.pooler_type == "cls":
+        pooler_output = cls.mlp(pooler_output)
 
     # Separate representation
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
@@ -257,40 +247,6 @@ def sentemb_forward(
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
-    if cls.model_args.mask_embedding_sentence and hasattr(cls, 'bs'):
-        new_input_ids = []
-        bs = torch.LongTensor(cls.bs).to(input_ids.device)
-        es = torch.LongTensor(cls.es).to(input_ids.device)
-
-        for i in input_ids:
-            ss = i.shape[0]
-            d = i.device
-            ii = i[i != cls.# The code `pad_token_id` is likely a variable or parameter in a Python
-            # script. It is not clear from the provided snippet what the variable is
-            # being used for or how it is defined. More context or code surrounding
-            # this snippet would be needed to provide a more specific explanation.
-            pad_token_id]
-            ni = [ii[:1], bs]
-            if ii.shape[0] > 2:
-                ni += [ii[1:-1]]
-            ni += [es, ii[-1:]]
-            if ii.shape[0] < i.shape[0]:
-                ni += [i[i == cls.pad_token_id]]
-            ni = torch.cat(ni)
-            try:
-                assert ss + bs.shape[0] + es.shape[0] == ni.shape[0]
-            except:
-                print(ss + bs.shape[0] + es.shape[0])
-                print(ni.shape[0])
-                print(i.tolist())
-                print(ni.tolist())
-                assert 0
-
-            new_input_ids.append(ni)
-        input_ids = torch.stack(new_input_ids, dim=0)
-        attention_mask = (input_ids != cls.pad_token_id).long()
-        token_type_ids = None
-
     outputs = encoder(
         input_ids,
         attention_mask=attention_mask,
@@ -302,18 +258,6 @@ def sentemb_forward(
         output_hidden_states=True if cls.pooler_type in ['avg_top2', 'avg_first_last'] else False,
         return_dict=True,
     )
-
-    if cls.model_args.mask_embedding_sentence and hasattr(cls, 'bs'):
-        last_hidden = outputs.last_hidden_state
-        pooler_output = last_hidden[input_ids == cls.mask_token_id]
-
-        if cls.model_args.mask_embedding_sentence_avg:
-            pooler_output = pooler_output.view(input_ids.shape[0], -1)
-        else:
-            pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)
-    if not cls.model_args.mlp_only_train and not cls.model_args.mask_embedding_sentence_org_mlp:
-        pooler_output = cls.mlp(pooler_output)
-
 
     pooler_output = cls.pooler(attention_mask, outputs)
     if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
