@@ -98,6 +98,20 @@ class ModelArguments:
         }
     )
 
+    do_prompt_enhancement: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use prompt enhancement."
+        }
+    )
+
+    prompt_template: Optional[str] = field(
+        default='This sentence : "{sentence}" means [MASK].',
+        metadata={
+            "help": "The prompt template."
+        }
+    )
+
 
     dropout: float = field(
         default=0.1,

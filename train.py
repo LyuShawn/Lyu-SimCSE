@@ -151,7 +151,13 @@ def main():
         sent1_cname = column_names[0]
     else:
         raise NotImplementedError
-                            
+
+    if model_args.do_prompt_enhancement:
+        # 如果需要增强prompt
+        template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
+        model_args.prompt_prefix = template.split('{sentence}')[0]    
+        model_args.prompt_suffix = template.split('{sentence}')[1]
+        model_args.mask_token_id = tokenizer.mask_token_id
 
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,

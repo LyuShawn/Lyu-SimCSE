@@ -155,11 +155,17 @@ def cl_forward(cls,
 
     # Pooling
 
-    pooler_output = cls.pooler(attention_mask, outputs)
+    if cls.model_args.do_prompt_enhancement:
+        pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size, num_sent, -1)
+    else:
+        pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
-    if cls.pooler_type == "cls":
-        pooler_output = cls.mlp(pooler_output)
+    if cls.model_args.do_prompt_enhancement:
+        pass
+    else:
+        if cls.pooler_type == "cls":
+            pooler_output = cls.mlp(pooler_output)
 
     # Separate representation
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
