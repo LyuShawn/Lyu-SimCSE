@@ -6,11 +6,12 @@ import torch
 from transformers import AutoModel, AutoTokenizer
 import json
 
-PATH_TO_SENTEVAL = "./SentEval"
-PATH_TO_DATA = "./SentEval/data"
-sys.path.insert(0, PATH_TO_SENTEVAL)
+PATH_TO_SENTEVAL = './SentEval'
+PATH_TO_DATA = './SentEval/data'
 
+sys.path.insert(0, PATH_TO_SENTEVAL)
 import senteval
+
 
 logger = logging.getLogger(__name__)
 

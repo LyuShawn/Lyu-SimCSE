@@ -1,6 +1,6 @@
 import logging
 import os
-from senteval.auto_eval import eval
+from utils.auto_eval import eval
 
 from datasets import load_dataset
 
