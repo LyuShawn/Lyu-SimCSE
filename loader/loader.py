@@ -40,14 +40,14 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
     if model_args.do_prompt_enhancement:
         sent_features = {}
-        model_args.prompt_prefix_input_ids = tokenizer(model_args.prompt_prefix)["input_ids"][:-1]
-        model_args.prompt_suffix_input_ids = tokenizer(model_args.prompt_suffix)["input_ids"][1:]
+        prompt_prefix_input_ids = model_args.prompt_prefix_input_ids
+        prompt_suffix_input_ids = model_args.prompt_suffix_input_ids
         input_ids = []
         attention_mask = []
         for i,s in enumerate(sentences):
             s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-            input_ids.append(model_args.prompt_prefix_input_ids + s['input_ids'] + model_args.prompt_suffix_input_ids)
-            attention_mask.append([0] * len(model_args.prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(model_args.prompt_suffix_input_ids))
+            input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
+            attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
 
         sent_features['input_ids'] = input_ids
         sent_features['attention_mask'] = attention_mask

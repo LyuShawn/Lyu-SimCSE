@@ -94,5 +94,6 @@ class CLTrainer(Trainer):
             avg_transfer /= 7
             metrics["eval_avg_transfer"] = avg_transfer
 
-        self.log(metrics)
+        # self.log(metrics)
+        logger.info(metrics)
         return metrics

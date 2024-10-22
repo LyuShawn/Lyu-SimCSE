@@ -253,6 +253,19 @@ def sentemb_forward(
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
+    if cls.model_args.do_prompt_enhancement:
+        prompt_prefix_input_ids = torch.tensor(cls.model_args.prompt_prefix_input_ids).to(input_ids.device)
+        prompt_suffix_input_ids = torch.tensor(cls.model_args.prompt_suffix_input_ids).to(input_ids.device)
+
+        input_ids = torch.cat([prompt_prefix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1), 
+                               input_ids, 
+                               prompt_suffix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1)], dim=1)
+
+        # 拼接出新的attention_mask，将prompt部分的attention_mask设置为1，prefix和suffix部分设置为0
+        attention_mask = torch.cat([torch.zeros(input_ids.size(0), prompt_prefix_input_ids.size(0)).to(input_ids.device), 
+                                    attention_mask, 
+                                    torch.zeros(input_ids.size(0), prompt_suffix_input_ids.size(0)).to(input_ids.device)], dim=1)
+        token_type_ids = None
     outputs = encoder(
         input_ids,
         attention_mask=attention_mask,
@@ -265,7 +278,11 @@ def sentemb_forward(
         return_dict=True,
     )
 
-    pooler_output = cls.pooler(attention_mask, outputs)
+    if cls.model_args.do_prompt_enhancement:
+        pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id]
+        pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)
+    else:
+        pooler_output = cls.pooler(attention_mask, outputs)
     if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
         pooler_output = cls.mlp(pooler_output)
 
