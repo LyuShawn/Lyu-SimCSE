@@ -157,6 +157,26 @@ def cl_forward(cls,
 
     if cls.model_args.do_prompt_enhancement:
         pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size, num_sent, -1)
+
+        if cls.model_args.do_prompt_denoising:
+            # 去噪
+            prompt_token = cls.model_args.prompt_token
+            p_input_ids = torch.tensor(prompt_token["input_ids"]).to(cls.device).unsqueeze(0).repeat(pooler_output.size(0), 1).long()
+            len = p_input_ids.shape[1]
+            blen = attention_mask.sum(-1) - len
+            p_attention_mask = torch.tensor(prompt_token["attention_mask"]).to(cls.device).unsqueeze(0).repeat(pooler_output.size(0), 1).long()
+            p_position_ids = torch.arange(p_input_ids.shape[1]).to(cls.device).unsqueeze(0).repeat(pooler_output.size(0), 1).long()
+            outputs = encoder(
+                input_ids = p_input_ids,
+                position_ids = p_position_ids,
+                output_hidden_states=True,
+                return_dict=True
+            )
+            last_hidden = outputs.last_hidden_state
+            noise = last_hidden[p_input_ids == cls.model_args.mask_token_id]
+            noise = noise.unsqueeze(1).repeat(1, num_sent, 1)
+            # blen = blen.view(num_sent,-1)
+            pooler_output -= noise * cls.model_args.prompt_denoising_weight
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
@@ -258,8 +278,8 @@ def sentemb_forward(
         prompt_suffix_input_ids = torch.tensor(cls.model_args.prompt_suffix_input_ids).to(input_ids.device)
 
         input_ids = torch.cat([prompt_prefix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1), 
-                               input_ids, 
-                               prompt_suffix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1)], dim=1)
+                            input_ids, 
+                            prompt_suffix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1)], dim=1)
 
         # 拼接出新的attention_mask，将prompt部分的attention_mask设置为1，prefix和suffix部分设置为0
         attention_mask = torch.cat([torch.zeros(input_ids.size(0), prompt_prefix_input_ids.size(0)).to(input_ids.device), 

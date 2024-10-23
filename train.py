@@ -162,6 +162,7 @@ def main():
         model_args.prompt_prefix_input_ids = tokenizer(model_args.prompt_prefix)["input_ids"][:-1]
         model_args.prompt_suffix_input_ids = tokenizer(model_args.prompt_suffix)["input_ids"][1:]
 
+        model_args.prompt_token = tokenizer(model_args.prompt_prefix + model_args.prompt_suffix)
 
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,

@@ -105,6 +105,21 @@ class ModelArguments:
         }
     )
 
+    do_prompt_denoising: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use prompt denoising."
+        }
+    )
+
+    prompt_denoising_weight: float = field(
+        default=1,
+        metadata={
+            "help": "Weight for prompt denoising auxiliary objective (only effective if --do_prompt_denoising)."
+        }
+    )
+
+
     prompt_template: Optional[str] = field(
         default='This sentence : "{sentence}" means [MASK].',
         metadata={
