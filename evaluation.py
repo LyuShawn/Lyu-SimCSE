@@ -6,6 +6,7 @@ import torch
 from transformers import AutoModel, AutoTokenizer,HfArgumentParser
 import json
 from arguments import ModelArguments,EvalArguments
+from datetime import datetime
 
 
 PATH_TO_SENTEVAL = './SentEval'
@@ -90,15 +91,12 @@ class EvaluationUtil:
             result = self.eval_core(
                 epoch=index
             )
-            logger.info(f"index:{index}, result:{result}")
             # 处理结果，把结果保存到task_scores中
             self.process_result(result)
 
         if self.local_model:
             with open(os.path.join(self.path, "avg_scores.json"), "w") as f:
                 json.dump(self.scores, f, indent=4, sort_keys=True)
-
-        logger.info(f"evaluation finished, result:{self.scores}")
         return self.scores
 
     @property
@@ -116,7 +114,7 @@ class EvaluationUtil:
 
     @property
     def scores(self):
-        return {"avg_scores": self.avg_scores, "task_scores": self.task_scores}
+        return {"eval_time": datetime.now(),"avg_scores": self.avg_scores, "task_scores": self.task_scores}
 
     def process_result(self, result):
         sum = 0
@@ -182,6 +180,15 @@ class EvaluationUtil:
 
             sentences = [" ".join(s) for s in batch]
 
+            if self.args.do_prompt_enhancement and self.args.prompt_template:
+                # 做提示增强，准备prompt
+                template = self.args.prompt_template
+                template = template.replace("[MASK]", self.tokenizer.mask_token)
+
+                for i, s in enumerate(sentences):
+                    if len(s) > 0 and s[-1] not in '.?"\'': s += '.'
+                    sentences[i] = template.replace("{sentence}", s).strip()
+
             # Tokenization
             if max_length is not None:
                 batch = self.tokenizer.batch_encode_plus(
@@ -204,13 +211,26 @@ class EvaluationUtil:
 
             # Get raw embeddings
             with torch.no_grad():
+
                 outputs = self.model(**batch, output_hidden_states=True, return_dict=True)
-                last_hidden = outputs.last_hidden_state
-                pooler_output = outputs.pooler_output
-                hidden_states = outputs.hidden_states
+
+                try:
+                    pooler_output = outputs.pooler_output
+                except AttributeError:
+                    pooler_output = outputs['last_hidden_state'][:, 0, :]
+
+                if self.args.do_prompt_enhancement:
+                    last_hidden = outputs.last_hidden_state
+                    pooler_output = last_hidden[batch['input_ids'] == self.tokenizer.mask_token_id]
+
+                else:
+                    last_hidden = outputs.last_hidden_state
+                    hidden_states = outputs.hidden_states
 
             # Apply different poolers
-            if pooler == "cls":
+            if self.args.do_prompt_enhancement:
+                return pooler_output.view(batch['input_ids'].shape[0], -1).cpu()
+            elif pooler == "cls":
                 # There is a linear+activation layer after CLS representation
                 return pooler_output.cpu()
             elif pooler == "cls_before_pooler":
@@ -308,7 +328,7 @@ class EvaluationUtil:
             scores.append("%.2f" % (sum([float(score) for score in scores]) / len(scores)))
             print_table(task_names, scores)
         return results
-
+ 
 
 def main():
     # 解析命令行参数

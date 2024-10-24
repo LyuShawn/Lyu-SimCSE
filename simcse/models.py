@@ -109,7 +109,27 @@ def cl_forward(cls,
     mlm_input_ids=None,
     mlm_labels=None,
 ):
+    def get_delta(template_token, length=50):
+        with torch.set_grad_enabled(True):
+            device = input_ids.device
+            d_input_ids = torch.Tensor(template_token).repeat(length, 1).to(device).long()
+            d_inputs_embeds = None
+            d_position_ids = torch.arange(d_input_ids.shape[1]).to(device).unsqueeze(0).repeat(length, 1).long()
+            if True:
+                d_position_ids[:, len(cls.model_args.prompt_prefix_input_ids)+1:] += torch.arange(length).to(device).unsqueeze(-1)
+            m_mask = d_input_ids == cls.model_args.mask_token_id
+            outputs = encoder(input_ids=d_input_ids if d_inputs_embeds is None else None ,
+                    inputs_embeds=d_inputs_embeds,
+                    position_ids=d_position_ids,  output_hidden_states=True, return_dict=True)
+            last_hidden = outputs.last_hidden_state
+            delta = last_hidden[m_mask]
+            template_len = d_input_ids.shape[1]
+            if True:
+                delta = cls.mlp(delta)
+            return delta, template_len
 
+    if cls.model_args.do_prompt_denoising:
+        noise, template_len = get_delta(cls.model_args.prompt_token["input_ids"])
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
     ori_input_ids = input_ids
@@ -160,23 +180,11 @@ def cl_forward(cls,
 
         if cls.model_args.do_prompt_denoising:
             # 去噪
-            prompt_token = cls.model_args.prompt_token
-            p_input_ids = torch.tensor(prompt_token["input_ids"]).to(cls.device).unsqueeze(0).repeat(pooler_output.size(0), 1).long()
-            len = p_input_ids.shape[1]
-            blen = attention_mask.sum(-1) - len
-            p_attention_mask = torch.tensor(prompt_token["attention_mask"]).to(cls.device).unsqueeze(0).repeat(pooler_output.size(0), 1).long()
-            p_position_ids = torch.arange(p_input_ids.shape[1]).to(cls.device).unsqueeze(0).repeat(pooler_output.size(0), 1).long()
-            outputs = encoder(
-                input_ids = p_input_ids,
-                position_ids = p_position_ids,
-                output_hidden_states=True,
-                return_dict=True
-            )
-            last_hidden = outputs.last_hidden_state
-            noise = last_hidden[p_input_ids == cls.model_args.mask_token_id]
-            noise = noise.unsqueeze(1).repeat(1, num_sent, 1)
-            # blen = blen.view(num_sent,-1)
-            pooler_output -= noise * cls.model_args.prompt_denoising_weight
+            blen = attention_mask.sum(-1) - template_len
+            # if cls.model_args.mask_embedding_sentence_org_mlp and not cls.model_args.mlp_only_train:
+            #     pooler_output, delta = cls.mlp(pooler_output), cls.mlp(delta)
+            pooler_output -= noise[blen]
+
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
