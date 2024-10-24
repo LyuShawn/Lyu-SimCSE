@@ -8,7 +8,6 @@ import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 
-
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
 
@@ -114,7 +113,7 @@ class EvaluationUtil:
 
     @property
     def scores(self):
-        return {"eval_time": datetime.now(),"avg_scores": self.avg_scores, "task_scores": self.task_scores}
+        return {"eval_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"avg_scores": self.avg_scores, "task_scores": self.task_scores}
 
     def process_result(self, result):
         sum = 0

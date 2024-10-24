@@ -225,7 +225,7 @@ def main():
     results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-        eval_util = EvaluationUtil(path = model_args.model_name_or_path, args = model_args)
+        eval_util = EvaluationUtil(path = training_args.output_dir, args = model_args)
         results = eval_util.eval()
     return results
 
