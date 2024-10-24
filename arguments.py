@@ -271,3 +271,34 @@ class OurTrainingArguments(TrainingArguments):
         default=3,
         metadata={"help": "Limit the total amount of checkpoints."}
     )
+
+
+@dataclass
+class EvalArguments:
+
+    path: str = field(
+        metadata={"help": "The path to the model checkpoint."},
+    )
+
+    pooler : str = field(
+        default="cls",
+        metadata={"help": "The pooler type.",
+                "choices": ["cls", "cls_before_pooler", "avg", "avg_top2", "avg_first_last"]},
+    )
+
+    mode: str = field(
+        default="test",
+        metadata={"help": "The evaluation mode.",
+                "choices": ["dev", "test","fasttest"]},
+    )
+
+    task_set: str = field(
+        default="sts",
+        metadata={"help": "The task set.",
+                "choices": ["sts", "transfer, full","na"]},
+    )
+
+    times: int = field(
+        default=3,
+        metadata={"help": "The number of times to evaluate the model."},
+    )

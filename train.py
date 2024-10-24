@@ -1,6 +1,6 @@
 import logging
 import os
-from utils.auto_eval import eval
+from evaluation import EvaluationUtil
 
 from datasets import load_dataset
 
@@ -225,7 +225,8 @@ def main():
     results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-        results = eval(training_args.output_dir)
+        eval_util = EvaluationUtil(path = model_args.model_name_or_path, args = model_args)
+        results = eval_util.eval()
     return results
 
 
