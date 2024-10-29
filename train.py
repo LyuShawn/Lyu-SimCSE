@@ -164,6 +164,16 @@ def main():
 
         model_args.prompt_token = tokenizer(model_args.prompt_prefix + model_args.prompt_suffix)
 
+        if model_args.prompt_template2:
+            template2 = model_args.prompt_template2.replace('[MASK]', tokenizer.mask_token)
+            model_args.prompt_prefix2 = template2.split('{sentence}')[0]
+            model_args.prompt_suffix2 = template2.split('{sentence}')[1]
+            model_args.prompt_token2 = tokenizer(model_args.prompt_prefix2 + model_args.prompt_suffix2)
+
+            model_args.prompt_prefix_input_ids2 = tokenizer(model_args.prompt_prefix2)["input_ids"][:-1]
+            model_args.prompt_suffix_input_ids2 = tokenizer(model_args.prompt_suffix2)["input_ids"][1:]
+
+
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,
         data_args=data_args,

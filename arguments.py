@@ -119,9 +119,15 @@ class ModelArguments:
         }
     )
 
-
     prompt_template: Optional[str] = field(
         default='This sentence : "{sentence}" means [MASK].',
+        metadata={
+            "help": "The prompt template."
+        }
+    )
+
+    prompt_template2: Optional[str] = field(
+        default='This sentence of "{sentence}" means [MASK].',
         metadata={
             "help": "The prompt template."
         }

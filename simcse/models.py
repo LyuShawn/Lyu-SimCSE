@@ -131,6 +131,8 @@ def cl_forward(cls,
     if cls.model_args.do_prompt_denoising:
         noise, template_len = get_delta(cls.model_args.prompt_token["input_ids"])
 
+    template_len =50
+
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
     ori_input_ids = input_ids
     batch_size = input_ids.size(0)
@@ -176,14 +178,15 @@ def cl_forward(cls,
     # Pooling
 
     if cls.model_args.do_prompt_enhancement:
-        pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size, num_sent, -1)
+        pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size * num_sent, -1)
 
         if cls.model_args.do_prompt_denoising:
             # 去噪
             blen = attention_mask.sum(-1) - template_len
             # if cls.model_args.mask_embedding_sentence_org_mlp and not cls.model_args.mlp_only_train:
             #     pooler_output, delta = cls.mlp(pooler_output), cls.mlp(delta)
-            pooler_output -= noise[blen]
+            pooler_output -=  noise[blen]
+
 
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
