@@ -185,7 +185,7 @@ def cl_forward(cls,
             blen = attention_mask.sum(-1) - template_len
             # if cls.model_args.mask_embedding_sentence_org_mlp and not cls.model_args.mlp_only_train:
             #     pooler_output, delta = cls.mlp(pooler_output), cls.mlp(delta)
-            pooler_output -=  noise[blen]
+            pooler_output -=  noise[blen] * cls.model_args.prompt_denoising_weight
 
 
     else:
