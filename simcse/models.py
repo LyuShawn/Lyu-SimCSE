@@ -131,7 +131,8 @@ def cl_forward(cls,
     if cls.model_args.do_prompt_denoising:
         noise, template_len = get_delta(cls.model_args.prompt_token["input_ids"])
 
-    template_len =50
+        if cls.model_args.prompt_template2:
+            noise2, template_len2 = get_delta(cls.model_args.prompt_token2["input_ids"])
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
     ori_input_ids = input_ids
@@ -185,8 +186,18 @@ def cl_forward(cls,
             blen = attention_mask.sum(-1) - template_len
             # if cls.model_args.mask_embedding_sentence_org_mlp and not cls.model_args.mlp_only_train:
             #     pooler_output, delta = cls.mlp(pooler_output), cls.mlp(delta)
-            pooler_output -=  noise[blen] * cls.model_args.prompt_denoising_weight
 
+            if cls.model_args.prompt_template2:
+                pooler_output = pooler_output.view(batch_size, num_sent, -1)
+                attention_mask = attention_mask.view(batch_size, num_sent, -1)
+                blen = attention_mask.sum(-1) - template_len
+                pooler_output[:, 0, :] -= noise[blen[:, 0]]
+                blen = attention_mask.sum(-1) - template_len2
+                pooler_output[:, 1, :] -= noise2[blen[:, 1]]
+                if num_sent == 3:
+                    pooler_output[:, 2, :] -= noise2[blen[:, 2]]
+            else:
+                pooler_output -=  noise[blen] * cls.model_args.prompt_denoising_weight
 
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
