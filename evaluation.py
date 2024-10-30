@@ -135,6 +135,10 @@ class EvaluationUtil:
 
         pooler = self.pooler
 
+        if self.args.do_prompt_denoising:
+            noise, template_len = self.get_delta(self.model, self.args.prompt_template, self.tokenizer, self.device, self.args)
+
+
         # Set up the tasks
         if self.task_set == "sts":
             tasks = eval_task_list
@@ -222,6 +226,9 @@ class EvaluationUtil:
                     last_hidden = outputs.last_hidden_state
                     pooler_output = last_hidden[batch['input_ids'] == self.tokenizer.mask_token_id]
 
+                    if self.args.do_prompt_denoising:
+                            blen = batch['attention_mask'].sum(-1) - template_len
+                            pooler_output -= noise[blen] * self.args.prompt_denoising_weight
                 else:
                     last_hidden = outputs.last_hidden_state
                     hidden_states = outputs.hidden_states
@@ -327,7 +334,31 @@ class EvaluationUtil:
             scores.append("%.2f" % (sum([float(score) for score in scores]) / len(scores)))
             print_table(task_names, scores)
         return results
- 
+
+    def get_delta(self, model, template, tokenizer, device, args):
+        model.eval()
+
+        template = template.replace('*mask*', tokenizer.mask_token)\
+                        .replace('*sep+*', '')\
+                        .replace('*cls*', '').replace('*sent_0*', ' ')
+        # strip for roberta tokenizer
+        bs_length = len(tokenizer.encode(template.split(' ')[0].replace('_', ' ').strip())) - 2 + 1
+        # replace for roberta tokenizer
+        batch = tokenizer([template.replace('_', ' ').strip().replace('   ', ' ')], return_tensors='pt')
+        batch['position_ids'] = torch.arange(batch['input_ids'].shape[1]).to(device).unsqueeze(0)
+        for k in batch:
+            batch[k] = batch[k].repeat(256, 1).to(device)
+        batch['position_ids'][:, bs_length:] += torch.arange(256).to(device).unsqueeze(-1)
+        m_mask = batch['input_ids'] == tokenizer.mask_token_id
+
+        with torch.no_grad():
+            outputs = model(**batch,  output_hidden_states=True, return_dict=True)
+            last_hidden = outputs.hidden_states[-1]
+            delta = last_hidden[m_mask]
+        delta.requires_grad = False
+        #import pdb;pdb.set_trace()
+        template_len = batch['input_ids'].shape[1]
+        return delta, template_len
 
 def main():
     # 解析命令行参数
