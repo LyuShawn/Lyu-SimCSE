@@ -1,5 +1,5 @@
 # simcse
-transformers
+transformers==4.45.2
 scipy
 datasets
 pandas

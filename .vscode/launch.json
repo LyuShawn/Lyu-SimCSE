@@ -23,7 +23,7 @@
             "program": "${workspaceFolder}/train.py",
             "console": "integratedTerminal",
             "args": [
-                "--output_dir", "result/debug", "--do_train", "--do_eval","--do_prompt_enhancement","--do_prompt_denoising","--prompt_template2", "This sentence of '{sentence}' means [MASK]."
+                "--output_dir", "result/debug", "--do_train", "--do_eval","--shuffle_data","--logging_dir","logs","--logging_steps","10"
             ],
             "justMyCode": false
         },

@@ -277,10 +277,6 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "Whether to use 16-bit (mixed) precision (through NVIDIA Apex) instead of 32-bit"},
     )
 
-    distributed_state: Optional[str] = field(
-        default=None,
-    )
-
     save_total_limit: Optional[int] = field(
         default=3,
         metadata={"help": "Limit the total amount of checkpoints."}
