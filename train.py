@@ -68,7 +68,7 @@ def main():
 
     # 是否随机打乱数据
     if data_args.shuffle_data:
-        datasets = datasets.shuffle(seed=training_args.seed)
+        datasets = datasets.shuffle()
 
     # 加载模型参数
     logger.info("********* Load Model Config *********")
