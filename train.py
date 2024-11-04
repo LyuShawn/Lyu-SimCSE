@@ -67,6 +67,10 @@ def main():
     else:
         datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/")
 
+    # 是否随机打乱数据
+    if data_args.shuffle_data:
+        datasets = datasets.shuffle(seed=training_args.seed)
+
     # 加载模型参数
     logger.info("********* Load Model Config *********")
     config_kwargs = {

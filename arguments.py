@@ -149,6 +149,13 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
 
+    shuffle_data: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to shuffle the data."
+        }
+    )
+
     # Huggingface's original arguments. 
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
