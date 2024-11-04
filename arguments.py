@@ -287,6 +287,11 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "The list of integrations to report the results and logs to."}
     )
 
+    logging_steps: int = field(
+        default=50,
+        metadata={"help": "Log every X updates steps."}
+    )
+
 
 @dataclass
 class EvalArguments:
