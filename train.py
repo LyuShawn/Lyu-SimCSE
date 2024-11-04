@@ -44,8 +44,6 @@ def main():
     # logging.basicConfig(level=logging.INFO)
     # logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 
-    # 设置随机种子
-    set_seed(training_args.seed)
 
     # 打印参数
     logger.info("********* Arguments *********")
@@ -69,6 +67,9 @@ def main():
     # 是否随机打乱数据
     if data_args.shuffle_data:
         datasets = datasets.shuffle()
+
+    # 设置随机种子
+    set_seed(training_args.seed)
 
     # 加载模型参数
     logger.info("********* Load Model Config *********")
