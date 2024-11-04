@@ -282,6 +282,11 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "Limit the total amount of checkpoints."}
     )
 
+    report_to: Optional[str] = field(
+        default='all',
+        metadata={"help": "The list of integrations to report the results and logs to."}
+    )
+
 
 @dataclass
 class EvalArguments:

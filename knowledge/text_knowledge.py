@@ -1,3 +1,4 @@
+
 # 每条句子搜索wiki
 import redis
 import base64
@@ -7,7 +8,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
-r = redis.Redis(host='localhost', port=6379, db=0,password='lyuredis579')
+r = redis.Redis(host='localhost', port=6379, db=0, password='lyuredis579')
 
 prefix = 'wikisearch:'
 
@@ -16,9 +17,12 @@ api_url = 'https://en.wikipedia.org/w/api.php'
 headers = {
     "User-Agent": "Wiki Study/1.0 (905899183@qq.com)"
 }
+
+# 从环境变量中获取代理信息
+import os
 proxy = {
-    "http": "http://Clash:hN7jAEkQ@59.77.134.251:7890",
-    "https": "http://Clash:hN7jAEkQ@59.77.134.251:7890"
+    "http": os.getenv("HTTP_PROXY", ""),
+    "https": os.getenv("HTTPS_PROXY", "")
 }
 
 def search_wiki(text):

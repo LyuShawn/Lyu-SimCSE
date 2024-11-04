@@ -23,7 +23,8 @@
             "program": "${workspaceFolder}/train.py",
             "console": "integratedTerminal",
             "args": [
-                "--output_dir", "result/debug", "--do_train", "--do_eval","--shuffle_data","--logging_dir","logs","--logging_steps","10"
+                "--output_dir", "result/debug", 
+                "--do_train", "--do_eval","--shuffle_data",
             ],
             "justMyCode": false
         },

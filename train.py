@@ -41,9 +41,8 @@ def main():
         )
 
     # Setup logging
-    logging.basicConfig(level=logging.INFO)
-    logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
-    logging.getLogger().setLevel(logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 
     # 设置随机种子
     set_seed(training_args.seed)
