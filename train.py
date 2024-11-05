@@ -66,6 +66,7 @@ def main():
 
     # 是否随机打乱数据
     if data_args.shuffle_data:
+        # 这里的执行位置会受到到set_seed的影响
         datasets = datasets.shuffle()
 
     # 设置随机种子
@@ -155,6 +156,7 @@ def main():
         sent1_cname = column_names[0]
     else:
         raise NotImplementedError
+
 
     if model_args.do_prompt_enhancement:
         # 如果需要增强prompt

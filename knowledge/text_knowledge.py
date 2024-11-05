@@ -21,8 +21,9 @@ headers = {
 # 从环境变量中获取代理信息
 import os
 proxy = {
-    "http": os.getenv("HTTP_PROXY", ""),
-    "https": os.getenv("HTTPS_PROXY", "")
+    # "http": os.getenv("HTTP_PROXY", ""),
+    # "https": os.getenv("HTTPS_PROXY", "")
+    "https": "http://127.0.0.1:20172"
 }
 
 def search_wiki(text):
@@ -45,9 +46,8 @@ def search_wiki(text):
 def text_search(text):
     key = prefix + text_encode(text)
 
-    cached_data= r.get(key)
-    if cached_data:
-        return json.loads(cached_data)
+    if r.exists(key):
+        return json.loads(r.get(key))
     else:
         try:
             result = search_wiki(text)
