@@ -10,6 +10,8 @@ def output_score(dir, score_file_name="avg_scores.json", only_avg=True):
         print(f"{dir} does not exist.")
         return
 
+    output_list = []
+
     for file in os.listdir(dir):
         e_name = file.split(".")[0]
 
@@ -23,12 +25,19 @@ def output_score(dir, score_file_name="avg_scores.json", only_avg=True):
                 if only_avg:
                     avg_scores = avg_scores.get("avg", "N/A")
 
-                print(f"{e_name}: {avg_scores} (evaluated at {eval_time})")
+                output_list.append({
+                    "name": e_name,
+                    "eval_time": eval_time,
+                    "avg_scores": avg_scores
+                })
         else:
             print(f"{score_file} does not exist.")
 
-
-
+    # 按name排序
+    output_list = sorted(output_list, key=lambda x: x["name"])
+    # 输出
+    for item in output_list:
+        print(f"Name: {item['name']}, Eval Time: {item['eval_time']}, Avg Scores: {item['avg_scores']}")
 
 if __name__ == "__main__":
     # 接受一个dir参数
