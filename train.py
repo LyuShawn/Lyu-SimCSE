@@ -18,6 +18,7 @@ from simcse.trainers import CLTrainer
 from loader.loader import PrepareFeaturesArgs, prepare_features
 from loader.collator import OurDataCollatorWithPadding
 from arguments import (ModelArguments, DataTrainingArguments, OurTrainingArguments)
+import importlib.util
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,14 @@ def main():
     # logging.basicConfig(level=logging.INFO)
     # logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 
+
+    exp_name = training_args.output_dir.split('/')[-1]
+
+    wandb_installed = importlib.util.find_spec("wandb") is not None
+    # wandb
+    if wandb_installed:
+        import wandb
+        wandb.init(project="LyuCSE", name=exp_name)
 
     # 打印参数
     logger.info("********* Arguments *********")
@@ -253,6 +262,9 @@ def main():
         logger.info(f"*** Evaluate ***")
         eval_util = EvaluationUtil(path = training_args.output_dir, args = model_args)
         results = eval_util.eval()
+        if wandb_installed:
+            wandb.log(results)
+
     return results
 
 
