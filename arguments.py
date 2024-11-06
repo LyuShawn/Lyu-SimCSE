@@ -149,6 +149,13 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
 
+    set_seed_before_shuffle: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "Whether to set seed before shuffling the data."
+        }
+    )
+
     shuffle_data: Optional[bool] = field(
         default=False,
         metadata={

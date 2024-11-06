@@ -64,6 +64,10 @@ def main():
     else:
         datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/")
 
+    if data_args.set_seed_before_shuffle:
+        # 在shuffle之前设置随机种子，可以保证每次shuffle的结果一样
+        set_seed(training_args.seed)
+
     # 是否随机打乱数据
     if data_args.shuffle_data:
         # 这里的执行位置会受到到set_seed的影响
@@ -245,7 +249,8 @@ def main():
     # Evaluation
     results = {}
     if training_args.do_eval:
-        logger.info("*** Evaluate ***")
+
+        logger.info(f"*** Evaluate ***")
         eval_util = EvaluationUtil(path = training_args.output_dir, args = model_args)
         results = eval_util.eval()
     return results

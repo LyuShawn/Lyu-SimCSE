@@ -3,10 +3,11 @@ import os
 import logging
 from prettytable import PrettyTable
 import torch
-from transformers import AutoModel, AutoTokenizer,HfArgumentParser
+from transformers import AutoModel, AutoTokenizer,HfArgumentParser,set_seed
 import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
+import random
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -85,13 +86,16 @@ class EvaluationUtil:
         self.tokenizer = AutoTokenizer.from_pretrained(self.path)
 
         for index in range(self.times):
+            # 重置随机种子
+            seed = self.reset_seed()
+
             if self.local_model:
                 setup_logger(self.path, index)
             result = self.eval_core(
                 epoch=index
             )
             # 处理结果，把结果保存到task_scores中
-            self.process_result(result)
+            self.process_result(result, seed)
 
         if self.local_model:
             with open(os.path.join(self.path, "avg_scores.json"), "w") as f:
@@ -115,7 +119,7 @@ class EvaluationUtil:
     def scores(self):
         return {"eval_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"avg_scores": self.avg_scores, "task_scores": self.task_scores}
 
-    def process_result(self, result):
+    def process_result(self, result, seed=None):
         sum = 0
         for task in eval_task_list:
             if task in result:
@@ -126,6 +130,9 @@ class EvaluationUtil:
                     self.task_scores[task].append(result[task]["test"]["spearman"].correlation)
                     sum += result[task]["test"]["spearman"].correlation
         self.task_scores["avg"].append(sum / 7)
+        if "seed" not in self.task_scores:
+            self.task_scores["seed"] = []
+        self.task_scores["seed"].append(seed)
 
     def eval_core(
         self,
@@ -359,6 +366,13 @@ class EvaluationUtil:
         #import pdb;pdb.set_trace()
         template_len = batch['input_ids'].shape[1]
         return delta, template_len
+
+    def reset_seed(self, seed=None):
+        if seed is None:
+            seed = random.randint(0, 1000000)
+        set_seed(seed)
+        return seed
+
 
 def main():
     # 解析命令行参数
