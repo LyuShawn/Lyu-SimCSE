@@ -25,6 +25,7 @@
             "args": [
                 "--output_dir", "result/debug", 
                 "--do_train", "--do_eval",
+                "--do_prompt_enhancement"
             ],
             "justMyCode": false
         },

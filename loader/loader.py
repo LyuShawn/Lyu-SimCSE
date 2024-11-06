@@ -64,17 +64,20 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
                 input_ids.append(prompt_prefix_input_ids2 + s['input_ids'] + prompt_suffix_input_ids2)
 
+            # 处理拼接attention_mask
+            attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
         sent_features['input_ids'] = input_ids
-        sent_features['attention_mask'] = []
 
-        # 处理拼接attention_mask
-        ml = max([len(i) for i in sent_features['input_ids']])
-        for i in range(len(sent_features['input_ids'])):
-            t = sent_features['input_ids'][i]
-            sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
-            sent_features['attention_mask'].append(len(t)*[1] + (ml-len(t))*[0])
+        # 生成mask的
+        # sent_features['attention_mask'] = []
+        # ml = max([len(i) for i in sent_features['input_ids']])
+        # for i in range(len(sent_features['input_ids'])):
+        #     t = sent_features['input_ids'][i]
+        #     sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
+        #     sent_features['attention_mask'].append(len(t)*[1] + (ml-len(t))*[0])
 
-        # attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
+        sent_features['attention_mask'] = attention_mask
+
     else:
         sent_features = tokenizer(
             sentences,
