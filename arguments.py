@@ -156,6 +156,13 @@ class DataTrainingArguments:
         }
     )
 
+    sample_data: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "Sample data."
+        }
+    )
+
     # Huggingface's original arguments. 
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}

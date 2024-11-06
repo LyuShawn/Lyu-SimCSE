@@ -69,6 +69,10 @@ def main():
         # 这里的执行位置会受到到set_seed的影响
         datasets = datasets.shuffle()
 
+    # 是否采样数据
+    if data_args.sample_data:
+        datasets = datasets.select(range(data_args.sample_data))
+
     # 设置随机种子
     set_seed(training_args.seed)
 
