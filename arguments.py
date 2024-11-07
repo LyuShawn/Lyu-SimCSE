@@ -306,6 +306,10 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "Log every X updates steps."}
     )
 
+    debug_mode: bool = field(
+        default=False,
+        metadata={"help": "Debug mode."},
+    )
 
 @dataclass
 class EvalArguments:

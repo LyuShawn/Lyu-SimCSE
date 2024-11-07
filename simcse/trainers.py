@@ -1,4 +1,4 @@
-import sys
+import wandb
 import warnings
 from transformers import Trainer
 from transformers.utils import logging
@@ -94,6 +94,12 @@ class CLTrainer(Trainer):
             avg_transfer /= 7
             metrics["eval_avg_transfer"] = avg_transfer
 
-        # self.log(metrics)
+        self.log(metrics)
         logger.info(metrics)
+
+        # wandb_prefix = "eval_in_train"
+        # wandb_metrics = {f"{wandb_prefix}/{k}": v for k, v in metrics.items()}
+
+        # wandb.log(wandb_metrics)
+
         return metrics

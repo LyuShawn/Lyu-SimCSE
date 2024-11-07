@@ -8,6 +8,7 @@ import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 import random
+import wandb
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -98,8 +99,10 @@ class EvaluationUtil:
             self.process_result(result, seed)
 
         if self.local_model:
-            with open(os.path.join(self.path, "avg_scores.json"), "w") as f:
+            score_file_path = os.path.join(self.path, "avg_scores.json")
+            with open(score_file_path, "w") as f:
                 json.dump(self.scores, f, indent=4, sort_keys=True)
+            wandb.log({"score_file": wandb.save(score_file_path)})
         return self.scores
 
     @property
