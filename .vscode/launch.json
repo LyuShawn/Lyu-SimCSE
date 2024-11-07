@@ -24,7 +24,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--output_dir", "result/debug", "--debug_mode",
-                // "--do_train", 
+                "--do_train", 
                 "--do_eval",
                 "--do_prompt_enhancement",
                 "--shuffle_data","--sample_data","10000",

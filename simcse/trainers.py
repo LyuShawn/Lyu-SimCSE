@@ -95,11 +95,5 @@ class CLTrainer(Trainer):
             metrics["eval_avg_transfer"] = avg_transfer
 
         self.log(metrics)
-        logger.info(metrics)
-
-        # wandb_prefix = "eval_in_train"
-        # wandb_metrics = {f"{wandb_prefix}/{k}": v for k, v in metrics.items()}
-
-        # wandb.log(wandb_metrics)
 
         return metrics

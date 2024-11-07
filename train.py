@@ -50,8 +50,9 @@ def main():
 
     # wandb
     wandb_project = "Train_Debug" if training_args.debug_mode else "LyuCSE"
+    notes = training_args.notes if training_args.notes else None
     wandb.init(project=wandb_project, 
-                name=exp_name, save_code=True,)
+                name=exp_name, save_code=True, notes=notes,)
     logger.info(f"*** Wandb Will Save : {wandb.run.project}/{wandb.run.name} ***")
 
 
@@ -264,6 +265,9 @@ def main():
         eval_util = EvaluationUtil(path = training_args.output_dir, args = model_args)
         results = eval_util.eval()
         wandb.summary.update(results)
+
+    logger.info("********* Finish *********")
+    wandb.finish()
     return results
 
 

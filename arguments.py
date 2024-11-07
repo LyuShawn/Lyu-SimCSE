@@ -311,6 +311,11 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "Debug mode."},
     )
 
+    notes: str = field(
+        default="",
+        metadata={"help": "Notes."},
+    )
+
 @dataclass
 class EvalArguments:
 
