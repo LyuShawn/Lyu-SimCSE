@@ -1,3 +1,6 @@
+from utils.sentence_util import text_encode
+import redis
+import json
 
 class PrepareFeaturesArgs:
     def __init__(self, tokenizer, data_args, model_args, sent0_cname, sent1_cname, sent2_cname):
@@ -37,6 +40,9 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 examples[sent2_cname][idx] = " "
         sentences += examples[sent2_cname]
 
+    if "{title}" in model_args.prompt_template:
+        r = redis.Redis(host='59.77.134.205', port=6379, db=0, password='lyuredis579')
+
 
     if model_args.do_prompt_enhancement:
         sent_features = {}
@@ -53,6 +59,27 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         input_ids = []
         attention_mask = []
         for i,s in enumerate(sentences):
+
+            if "{title}" in model_args.prompt_template:
+                info = r.get(f"wikisearch:{text_encode(s)}")
+                use_title = False
+                if info:
+                    info = json.loads(info)
+                    if len(info) > 0:
+                        title_list = [item['title'] for item in info]
+                        if model_args.page_title_num != -1:
+                            title_list = title_list[:model_args.page_title_num]
+                        title_str = ", ".join(title_list)
+                        template = model_args.prompt_template.replace("{title}", title_str)
+                        use_title = True
+                if not use_title:
+                    template = model_args.prompt_template2
+
+                prompt_prefix = template.split("{sentence}")[0]
+                prompt_suffix = template.split("{sentence}")[1]
+                prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
+                prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
+
             # 处理拼接input_ids
             if i < total:
                 s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
@@ -66,15 +93,18 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
             # 处理拼接attention_mask
             attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
+        
         sent_features['input_ids'] = input_ids
-
-        # 生成mask的
-        # sent_features['attention_mask'] = []
-        # ml = max([len(i) for i in sent_features['input_ids']])
-        # for i in range(len(sent_features['input_ids'])):
-        #     t = sent_features['input_ids'][i]
-        #     sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
-        #     sent_features['attention_mask'].append(len(t)*[1] + (ml-len(t))*[0])
+        if model_args.use_prompt_bert_mask:
+            attention_mask = []
+        ml = max([len(i) for i in sent_features['input_ids']])
+        for i in range(len(sent_features['input_ids'])):
+            t = sent_features['input_ids'][i]
+            sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
+            if model_args.use_prompt_bert_mask:
+                attention_mask.append(len(t)*[1] + (ml-len(t))*[0])  # 全关注，不够的补0
+            else:
+                attention_mask[i] = attention_mask[i] + [0] * (ml-len(attention_mask[i]))
 
         sent_features['attention_mask'] = attention_mask
 

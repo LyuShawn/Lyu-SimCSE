@@ -142,6 +142,20 @@ class ModelArguments:
         }
     )
 
+    page_title_num: int = field(
+        default=-1,
+        metadata={
+            "help": "The number of page titles."
+        }
+    )
+
+    use_prompt_bert_mask: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use prompt bert mask."
+        }
+    )
+
 
 @dataclass
 class DataTrainingArguments:
