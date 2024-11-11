@@ -191,6 +191,17 @@ def main():
         model_args.prompt_prefix_input_ids = tokenizer(model_args.prompt_prefix)["input_ids"][:-1]
         model_args.prompt_suffix_input_ids = tokenizer(model_args.prompt_suffix)["input_ids"][1:]
 
+        if model_args.eval_template:
+            # 如果有eval_template，就使用eval_template
+            eval_template = model_args.eval_template.replace('[MASK]', tokenizer.mask_token)
+            eval_prefix = eval_template.split('{sentence}')[0]
+            eval_suffix = eval_template.split('{sentence}')[1]
+            model_args.eval_prefix_input_ids = tokenizer(eval_prefix)["input_ids"][:-1]
+            model_args.eval_suffix_input_ids = tokenizer(eval_suffix)["input_ids"][1:]
+        else:
+            model_args.eval_prefix_input_ids = model_args.prompt_prefix_input_ids
+            model_args.eval_suffix_input_ids = model_args.prompt_suffix_input_ids
+
         model_args.prompt_token = tokenizer(model_args.prompt_prefix + model_args.prompt_suffix)
 
         if model_args.prompt_template2:

@@ -26,15 +26,14 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                // "--do_prompt_enhancement",
-                "--overwrite_cache",
+                // "--overwrite_cache",
                 "--do_prompt_enhancement",
                 "--sample_data","10000",
-                "--per_device_train_batch_size", "64",
+                "--per_device_train_batch_size", "32",
                 "--eval_steps", "25",
                 "--prompt_template", "This sentence of '{sentence}' may about {title}, so it means [MASK].",
-                "--prompt_template2", "This sentence : '{sentence}' means [MASK].",
-                "--do_prompt_enhancement"
+                "--eval_template", "This sentence : '{sentence}' means [MASK].",
+                "--do_prompt_enhancement", "--mask_prompt"
             ],
             "justMyCode": false
         },

@@ -132,6 +132,14 @@ class ModelArguments:
         }
     )
 
+    eval_template: Optional[str] = field(
+        # This sentence : \'{sentence}\' means [MASK].
+        default='',
+        metadata={
+            "help": "如果指定了eval_template，那么在评估的时候，将使用这个模板。"
+        }
+    )
+
 
     dropout: float = field(
         default=0.1,
@@ -147,7 +155,7 @@ class ModelArguments:
         }
     )
 
-    use_prompt_bert_mask: bool = field(
+    mask_prompt: bool = field(
         default=False,
         metadata={
             "help": "Whether to use prompt bert mask."
@@ -339,7 +347,15 @@ class OurTrainingArguments(TrainingArguments):
         if self.gpu_no is not None:
             import os
             os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_no
+
+        # 如果没有设置run_name，给wandb设置一个默认的run_name
+        if not self.run_name:
+            self.run_name = self.output_dir.split("/")[-1]
+
         super().__post_init__()
+
+
+
 
 @dataclass
 class EvalArguments:

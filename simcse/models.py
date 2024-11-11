@@ -296,17 +296,23 @@ def sentemb_forward(
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
     if cls.model_args.do_prompt_enhancement:
-        prompt_prefix_input_ids = torch.tensor(cls.model_args.prompt_prefix_input_ids).to(input_ids.device)
-        prompt_suffix_input_ids = torch.tensor(cls.model_args.prompt_suffix_input_ids).to(input_ids.device)
+
+        # 只做表征的时候，不会用到外部知识，所以不需要使用外部知识的prompt
+        prompt_prefix_input_ids = torch.tensor(cls.model_args.eval_prefix_input_ids).to(input_ids.device)
+        prompt_suffix_input_ids = torch.tensor(cls.model_args.eval_suffix_input_ids).to(input_ids.device)
 
         input_ids = torch.cat([prompt_prefix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1), 
                             input_ids, 
                             prompt_suffix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1)], dim=1)
 
-        # 拼接出新的attention_mask，将prompt部分的attention_mask设置为1，prefix和suffix部分设置为0
-        attention_mask = torch.cat([torch.zeros(input_ids.size(0), prompt_prefix_input_ids.size(0)).to(input_ids.device), 
-                                    attention_mask, 
-                                    torch.zeros(input_ids.size(0), prompt_suffix_input_ids.size(0)).to(input_ids.device)], dim=1)
+        if cls.model_args.mask_prompt:
+            # 拼接出新的attention_mask，将prompt部分的attention_mask设置为1，prefix和suffix部分设置为0
+            attention_mask = torch.cat([torch.zeros(input_ids.size(0), prompt_prefix_input_ids.size(0)).to(input_ids.device), 
+                                        attention_mask,
+                                        torch.zeros(input_ids.size(0), prompt_suffix_input_ids.size(0)).to(input_ids.device)], dim=1)
+        else:
+            attention_mask = torch.ones_like(input_ids)
+
         token_type_ids = None
     outputs = encoder(
         input_ids,

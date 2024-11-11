@@ -52,7 +52,7 @@ def setup_logger(path, epoch):
 
 
 class EvaluationUtil:
-    def __init__(self, path, args, times=3, task_set="sts", mode="test", pooler=""):
+    def __init__(self, path, args, times=1, task_set="sts", mode="test", pooler=""):
         """数据准备"""
         self.path = path
         self.args = args
@@ -148,7 +148,6 @@ class EvaluationUtil:
         if self.args.do_prompt_denoising:
             noise, template_len = self.get_delta(self.model, self.args.prompt_template, self.tokenizer, self.device, self.args)
 
-
         # Set up the tasks
         if self.task_set == "sts":
             tasks = eval_task_list
@@ -195,7 +194,7 @@ class EvaluationUtil:
 
             if self.args.do_prompt_enhancement and self.args.prompt_template:
                 # 做提示增强，准备prompt
-                template = self.args.prompt_template
+                template = self.args.eval_template if self.args.eval_template else self.args.prompt_template
                 template = template.replace("[MASK]", self.tokenizer.mask_token)
 
                 for i, s in enumerate(sentences):

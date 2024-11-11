@@ -73,7 +73,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                         template = model_args.prompt_template.replace("{title}", title_str)
                         use_title = True
                 if not use_title:
-                    template = model_args.prompt_template2
+                    template = model_args.eval_template
 
                 prompt_prefix = template.split("{sentence}")[0]
                 prompt_suffix = template.split("{sentence}")[1]
@@ -91,20 +91,22 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
                 input_ids.append(prompt_prefix_input_ids2 + s['input_ids'] + prompt_suffix_input_ids2)
 
-            # 处理拼接attention_mask
-            attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
-        
+            if model_args.mask_prompt:
+                # mask prompt，prompt是0
+                attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
+
         sent_features['input_ids'] = input_ids
-        if model_args.use_prompt_bert_mask:
-            attention_mask = []
+
         ml = max([len(i) for i in sent_features['input_ids']])
         for i in range(len(sent_features['input_ids'])):
             t = sent_features['input_ids'][i]
             sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
-            if model_args.use_prompt_bert_mask:
-                attention_mask.append(len(t)*[1] + (ml-len(t))*[0])  # 全关注，不够的补0
-            else:
+            if model_args.mask_prompt:
+                # 按前面的attention_mask补0到ml
                 attention_mask[i] = attention_mask[i] + [0] * (ml-len(attention_mask[i]))
+            else:
+                # 不用管prompt，全关注
+                attention_mask.append(len(t)*[1] + (ml-len(t))*[0])
 
         sent_features['attention_mask'] = attention_mask
 
