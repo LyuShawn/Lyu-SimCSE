@@ -19,6 +19,7 @@ from loader.loader import PrepareFeaturesArgs, prepare_features
 from loader.collator import OurDataCollatorWithPadding
 from arguments import (ModelArguments, DataTrainingArguments, OurTrainingArguments)
 import wandb
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # 设置显卡
-    os.environ["CUDA_VISIBLE_DEVICES"] = training_args.device_no
+    torch.cuda.set_device(torch.device('cuda:{}'.format(training_args.device_no)))
 
     # 检查模型输出
     if (
