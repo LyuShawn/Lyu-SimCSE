@@ -330,6 +330,11 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "Notes."},
     )
 
+    device_no: str = field(
+        default="0",
+        metadata={"help": "Device number."},
+    )
+
 @dataclass
 class EvalArguments:
 
