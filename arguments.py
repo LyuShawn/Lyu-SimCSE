@@ -333,6 +333,13 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "GPU number."},
     )
 
+    # 设置torch
+    def __post_init__(self):
+
+        if self.gpu_no is not None:
+            import os
+            os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_no
+        super().__post_init__()
 
 @dataclass
 class EvalArguments:
