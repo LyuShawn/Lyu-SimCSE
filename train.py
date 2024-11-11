@@ -1,5 +1,6 @@
 import logging
 import os
+import argparse
 from evaluation import EvaluationUtil
 
 from datasets import load_dataset
@@ -31,7 +32,8 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # 设置显卡
-    torch.cuda.set_device(torch.device('cuda:{}'.format(training_args.device_no)))
+    os.environ["CUDA_VISIBLE_DEVICES"] = training_args.gpu_no
+    logger.info(f"*** CUDA_VISIBLE_DEVICES: {training_args.gpu_no} ***")
 
     # 检查模型输出
     if (
@@ -278,4 +280,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()

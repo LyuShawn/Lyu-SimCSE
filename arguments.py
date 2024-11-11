@@ -1,13 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Optional
-import torch
 
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     TrainingArguments,
 )
 
-from transformers.utils import is_torch_tpu_available,cached_property
 import logging
 
 logger = logging.getLogger(__name__)
@@ -330,10 +328,11 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "Notes."},
     )
 
-    device_no: str = field(
+    gpu_no: str = field(
         default="0",
-        metadata={"help": "Device number."},
+        metadata={"help": "GPU number."},
     )
+
 
 @dataclass
 class EvalArguments:
