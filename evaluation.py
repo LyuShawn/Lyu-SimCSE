@@ -8,17 +8,12 @@ import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 import random
-import wandb
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
 
 sys.path.insert(0, PATH_TO_SENTEVAL)
 import senteval
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler(sys.stdout))
 
 eval_task_list =[
     "STS12",
@@ -36,27 +31,16 @@ def print_table(task_names, scores):
     tb.add_row(scores)
     logging.info(tb)
 
-def setup_logger(path, epoch):
-    """logger"""
-    # setup log
-    log_path = os.path.join(path, "eval_logs")
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
-    log_file = os.path.join(log_path, f"{epoch}.log")
-    # 设置 log
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-    logging.basicConfig(
-        filename=log_file, format="%(asctime)s : %(message)s", level=logging.DEBUG
-    )
-
-
 class EvaluationUtil:
-    def __init__(self, path, args, times=1, task_set="sts", mode="test", pooler=""):
+    def __init__(self, path, args, task_set="sts", mode="test", pooler=""):
         """数据准备"""
-        self.path = path
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+
         self.args = args
-        self.times = times
         self.task_set = task_set
         self.mode = mode
 
@@ -66,87 +50,85 @@ class EvaluationUtil:
             self.pooler = pooler
         
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.local_model = os.path.exists(self.path)
-        if not self.local_model:
-            # 如果是hf上的模型，只eval一次，不保存log
-            self.times = 1
-            logger.info(f"load model from huggingface, path:{self.path}")
-
-        task_scores = {task: [] for task in eval_task_list}
-        task_scores["avg"] = []
-        self.task_scores = task_scores
+        self.local_model = os.path.exists(path)
+        self.base_path = path
+        self.path = [path]
+        if self.local_model:
+            for model_path in os.listdir(path):
+                if model_path.startswith("checkpoint-"):
+                    self.path.append(os.path.join(path, model_path))
+            logging.info(f"load model from local, path:{path}")
+        else:
+            logging.info(f"load model from huggingface, path:{path}")
 
     def eval(self):
         """评估入口"""
-        logger.info(
-            f"start evaluation {self.path},with times={self.times},pooler={self.pooler},task_set={self.task_set},mode={self.mode}"
+        logging.info(
+            f"start evaluation {self.path},with pooler={self.pooler},task_set={self.task_set},mode={self.mode}"
         )
 
-        # 加载模型
-        self.model = AutoModel.from_pretrained(self.path).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.path)
+        eval_result = {
+            "eval_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "avg_scores": {},
+            "eval_details": [],
+        }        
 
-        for index in range(self.times):
-            # 重置随机种子
-            seed = self.reset_seed()
+        for path in self.path:
+            if not os.path.exists(path):
+                logging.error(f"model path {path} not exists")
+                continue
 
-            if self.local_model:
-                setup_logger(self.path, index)
             result = self.eval_core(
-                epoch=index
+                model_path=path
             )
-            # 处理结果，把结果保存到task_scores中
-            self.process_result(result, seed)
+            # 处理结果
+            result = self.process_result(result)
+            eval_result["eval_details"].append({
+                "path": path,
+                "result": result,
+                "avg": result["avg"],
+            })
+
+        # avg_scores 保存最好的结果
+        best_result = max(eval_result["eval_details"], key=lambda x: x["avg"])
+        eval_result["avg_scores"] = best_result["result"]
 
         if self.local_model:
-            score_file_path = os.path.join(self.path, "avg_scores.json")
+            score_file_path = os.path.join(self.base_path, "avg_scores.json")
             with open(score_file_path, "w") as f:
-                json.dump(self.scores, f, indent=4, sort_keys=True)
-            wandb.log({"score_file": wandb.save(score_file_path)})
-        return self.scores
+                json.dump(eval_result, f, indent=4, sort_keys=True)
+            return eval_result, score_file_path
+        else:
+            return eval_result
 
-    @property
-    def avg_scores(self):
-        # 计算平均值
-        avg_scores = {task: [] for task in eval_task_list}
-        avg_scores["avg"] = []
+    def process_result(self, result):
+        """处理senteval的结果"""
+        task_scores = {}
 
-        task_list = eval_task_list
-        task_list.append("avg")
-
-        for task in task_list:
-            avg_scores[task] = sum(self.task_scores[task]) / len(self.task_scores[task])
-        return avg_scores
-
-    @property
-    def scores(self):
-        return {"eval_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"avg_scores": self.avg_scores, "task_scores": self.task_scores}
-
-    def process_result(self, result, seed=None):
-        sum = 0
         for task in eval_task_list:
             if task in result:
                 if task in ["STS12", "STS13", "STS14", "STS15", "STS16"]:
-                    self.task_scores[task].append(result[task]["all"]["spearman"]["all"])
-                    sum += result[task]["all"]["spearman"]["all"]
+                    task_scores[task] = result[task]["all"]["spearman"]["all"]
                 else:
-                    self.task_scores[task].append(result[task]["test"]["spearman"].correlation)
-                    sum += result[task]["test"]["spearman"].correlation
-        self.task_scores["avg"].append(sum / 7)
-        if "seed" not in self.task_scores:
-            self.task_scores["seed"] = []
-        self.task_scores["seed"].append(seed)
+                    task_scores[task] = result[task]["test"]["spearman"].correlation
+
+        task_scores["avg"] = sum(task_scores.values()) / len(task_scores)
+        return task_scores
 
     def eval_core(
         self,
-        epoch,
+        model_path,
     ):
         """评估核心"""
+
+        # 加载模型
+        model = AutoModel.from_pretrained(model_path).to(self.device)
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
 
         pooler = self.pooler
 
         if self.args.do_prompt_denoising:
-            noise, template_len = self.get_delta(self.model, self.args.prompt_template, self.tokenizer, self.device, self.args)
+            noise, template_len = self.get_delta(model, self.args.prompt_template, tokenizer, self.device, self.args)
 
         # Set up the tasks
         if self.task_set == "sts":
@@ -195,7 +177,7 @@ class EvaluationUtil:
             if self.args.do_prompt_enhancement and self.args.prompt_template:
                 # 做提示增强，准备prompt
                 template = self.args.eval_template if self.args.eval_template else self.args.prompt_template
-                template = template.replace("[MASK]", self.tokenizer.mask_token)
+                template = template.replace("[MASK]", tokenizer.mask_token)
 
                 for i, s in enumerate(sentences):
                     if len(s) > 0 and s[-1] not in '.?"\'': s += '.'
@@ -203,7 +185,7 @@ class EvaluationUtil:
 
             # Tokenization
             if max_length is not None:
-                batch = self.tokenizer.batch_encode_plus(
+                batch = tokenizer.batch_encode_plus(
                     sentences,
                     return_tensors="pt",
                     padding=True,
@@ -211,7 +193,7 @@ class EvaluationUtil:
                     truncation=True,
                 )
             else:
-                batch = self.tokenizer.batch_encode_plus(
+                batch = tokenizer.batch_encode_plus(
                     sentences,
                     return_tensors="pt",
                     padding=True,
@@ -224,7 +206,7 @@ class EvaluationUtil:
             # Get raw embeddings
             with torch.no_grad():
 
-                outputs = self.model(**batch, output_hidden_states=True, return_dict=True)
+                outputs = model(**batch, output_hidden_states=True, return_dict=True)
 
                 try:
                     pooler_output = outputs.pooler_output
@@ -233,7 +215,7 @@ class EvaluationUtil:
 
                 if self.args.do_prompt_enhancement:
                     last_hidden = outputs.last_hidden_state
-                    pooler_output = last_hidden[batch['input_ids'] == self.tokenizer.mask_token_id]
+                    pooler_output = last_hidden[batch['input_ids'] == tokenizer.mask_token_id]
 
                     if self.args.do_prompt_denoising:
                             blen = batch['attention_mask'].sum(-1) - template_len
@@ -365,7 +347,6 @@ class EvaluationUtil:
             last_hidden = outputs.hidden_states[-1]
             delta = last_hidden[m_mask]
         delta.requires_grad = False
-        #import pdb;pdb.set_trace()
         template_len = batch['input_ids'].shape[1]
         return delta, template_len
 
@@ -383,7 +364,6 @@ def main():
 
     eval_util = EvaluationUtil(path = eval_args.path, 
                             args = model_args, 
-                            times=eval_args.times,
                             task_set=eval_args.task_set, 
                             mode = eval_args.mode, 
                             pooler=eval_args.pooler)

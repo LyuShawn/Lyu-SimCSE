@@ -277,9 +277,9 @@ def main():
 
         logger.info(f"*** Evaluate ***")
         eval_util = EvaluationUtil(path = training_args.output_dir, args = model_args)
-        results = eval_util.eval()
+        results, result_file_path = eval_util.eval()
         wandb.log(results)
-        wandb.summary.update(results)
+        wandb.log({"score_file": wandb.save(result_file_path)})
 
     logger.info("********* Finish *********")
     wandb.finish()
