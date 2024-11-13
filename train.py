@@ -276,7 +276,7 @@ def main():
     if training_args.do_eval:
 
         logger.info(f"*** Evaluate ***")
-        eval_util = EvaluationUtil(path = training_args.output_dir, args = model_args)
+        eval_util = EvaluationUtil(path = training_args.output_dir, model_args = model_args)
         results, result_file_path = eval_util.eval()
         wandb.log(results)
         wandb.log({"score_file": wandb.save(result_file_path)})

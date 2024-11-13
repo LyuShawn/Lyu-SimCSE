@@ -26,14 +26,14 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                // "--overwrite_cache",
-                "--do_prompt_enhancement",
-                // "--sample_data","10000",
-                "--per_device_train_batch_size", "32",
-                "--eval_steps", "25",
-                "--prompt_template", "This sentence of '{sentence}' may about {title}, so it means [MASK].",
-                "--eval_template", "This sentence : '{sentence}' means [MASK].",
-                "--do_prompt_enhancement", "--mask_prompt"
+                // // "--overwrite_cache",
+                // "--do_prompt_enhancement",
+                // // "--sample_data","10000",
+                // "--per_device_train_batch_size", "32",
+                // "--eval_steps", "25",
+                // "--prompt_template", "This sentence of '{sentence}' may about {title}, so it means [MASK].",
+                // "--eval_template", "This sentence : '{sentence}' means [MASK].",
+                // "--do_prompt_enhancement", "--mask_prompt"
             ],
             "justMyCode": false
         },
@@ -44,7 +44,7 @@
             "program": "${workspaceFolder}/evaluation.py",
             "console": "integratedTerminal",
             "args": [
-                "--path", "result/debug"
+                "--path", "princeton-nlp/unsup-simcse-bert-base-uncased"
             ],
             "justMyCode": false
         }

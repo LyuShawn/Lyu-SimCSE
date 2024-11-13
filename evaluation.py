@@ -3,11 +3,12 @@ import os
 import logging
 from prettytable import PrettyTable
 import torch
-from transformers import AutoModel, AutoTokenizer,HfArgumentParser,set_seed
+from transformers import AutoModel, AutoTokenizer,HfArgumentParser
 import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 import random
+from simcse.models import BertForCL
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -32,7 +33,7 @@ def print_table(task_names, scores):
     logging.info(tb)
 
 class EvaluationUtil:
-    def __init__(self, path, args, task_set="sts", mode="test", pooler=""):
+    def __init__(self, path, model_args, task_set="sts", mode="test", *args ,**kwargs):
         """数据准备"""
 
         logging.basicConfig(
@@ -40,26 +41,24 @@ class EvaluationUtil:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
 
-        self.args = args
+        self.model_args = model_args
         self.task_set = task_set
         self.mode = mode
-
-        if not pooler:
-            self.pooler = args.pooler_type
-        else:
-            self.pooler = pooler
-        
+        self.pooler = model_args.pooler_type
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
         self.local_model = os.path.exists(path)
         self.base_path = path
+
         self.path = [path]
+
         if self.local_model:
             for model_path in os.listdir(path):
                 if model_path.startswith("checkpoint-"):
                     self.path.append(os.path.join(path, model_path))
             logging.info(f"load model from local, path:{path}")
         else:
-            logging.info(f"load model from huggingface, path:{path}")
+            logging.info(f"load model from huggingface, path:{path}")   
 
     def eval(self):
         """评估入口"""
@@ -74,12 +73,22 @@ class EvaluationUtil:
         }        
 
         for path in self.path:
-            if not os.path.exists(path):
-                logging.error(f"model path {path} not exists")
-                continue
+
+            if self.local_model:
+                model = BertForCL.from_pretrained(path, model_args=self.model_args)
+            else:
+                model = AutoModel.from_pretrained(path).to(self.device)
+
+            tokenizer = AutoTokenizer.from_pretrained(path)
+            model.to(self.device)
+
+            # 只做文本表征时用
+            args = {"sent_emb": True}            
 
             result = self.eval_core(
-                model_path=path
+                model=model,
+                tokenizer=tokenizer,
+                args=args
             )
             # 处理结果
             result = self.process_result(result)
@@ -117,18 +126,13 @@ class EvaluationUtil:
 
     def eval_core(
         self,
-        model_path,
+        model,
+        tokenizer,
+        args=None,
     ):
         """评估核心"""
 
-        # 加载模型
-        model = AutoModel.from_pretrained(model_path).to(self.device)
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-
         pooler = self.pooler
-
-        if self.args.do_prompt_denoising:
-            noise, template_len = self.get_delta(model, self.args.prompt_template, tokenizer, self.device, self.args)
 
         # Set up the tasks
         if self.task_set == "sts":
@@ -174,9 +178,9 @@ class EvaluationUtil:
 
             sentences = [" ".join(s) for s in batch]
 
-            if self.args.do_prompt_enhancement and self.args.prompt_template:
+            if self.model_args.do_prompt_enhancement and self.model_args.prompt_template:
                 # 做提示增强，准备prompt
-                template = self.args.eval_template if self.args.eval_template else self.args.prompt_template
+                template = self.model_args.eval_template if self.model_args.eval_template else self.model_args.prompt_template
                 template = template.replace("[MASK]", tokenizer.mask_token)
 
                 for i, s in enumerate(sentences):
@@ -206,26 +210,19 @@ class EvaluationUtil:
             # Get raw embeddings
             with torch.no_grad():
 
-                outputs = model(**batch, output_hidden_states=True, return_dict=True)
-
-                try:
-                    pooler_output = outputs.pooler_output
-                except AttributeError:
-                    pooler_output = outputs['last_hidden_state'][:, 0, :]
-
-                if self.args.do_prompt_enhancement:
-                    last_hidden = outputs.last_hidden_state
-                    pooler_output = last_hidden[batch['input_ids'] == tokenizer.mask_token_id]
-
-                    if self.args.do_prompt_denoising:
-                            blen = batch['attention_mask'].sum(-1) - template_len
-                            pooler_output -= noise[blen] * self.args.prompt_denoising_weight
+                if self.local_model:
+                    outputs = model(**batch, output_hidden_states=True, return_dict=True, **args)
                 else:
-                    last_hidden = outputs.last_hidden_state
-                    hidden_states = outputs.hidden_states
+                    outputs = model(**batch, output_hidden_states=True, return_dict=True)
+
+                last_hidden = outputs.last_hidden_state
+                hidden_states = outputs.hidden_states
+                pooler_output = outputs.pooler_output
 
             # Apply different poolers
-            if self.args.do_prompt_enhancement:
+            if self.model_args.do_prompt_enhancement:
+                pooler_output = last_hidden[batch['input_ids'] == tokenizer.mask_token_id]
+                # 如果有应用模板去燥再加
                 return pooler_output.view(batch['input_ids'].shape[0], -1).cpu()
             elif pooler == "cls":
                 # There is a linear+activation layer after CLS representation
@@ -326,49 +323,16 @@ class EvaluationUtil:
             print_table(task_names, scores)
         return results
 
-    def get_delta(self, model, template, tokenizer, device, args):
-        model.eval()
-
-        template = template.replace('*mask*', tokenizer.mask_token)\
-                        .replace('*sep+*', '')\
-                        .replace('*cls*', '').replace('*sent_0*', ' ')
-        # strip for roberta tokenizer
-        bs_length = len(tokenizer.encode(template.split(' ')[0].replace('_', ' ').strip())) - 2 + 1
-        # replace for roberta tokenizer
-        batch = tokenizer([template.replace('_', ' ').strip().replace('   ', ' ')], return_tensors='pt')
-        batch['position_ids'] = torch.arange(batch['input_ids'].shape[1]).to(device).unsqueeze(0)
-        for k in batch:
-            batch[k] = batch[k].repeat(256, 1).to(device)
-        batch['position_ids'][:, bs_length:] += torch.arange(256).to(device).unsqueeze(-1)
-        m_mask = batch['input_ids'] == tokenizer.mask_token_id
-
-        with torch.no_grad():
-            outputs = model(**batch,  output_hidden_states=True, return_dict=True)
-            last_hidden = outputs.hidden_states[-1]
-            delta = last_hidden[m_mask]
-        delta.requires_grad = False
-        template_len = batch['input_ids'].shape[1]
-        return delta, template_len
-
-    def reset_seed(self, seed=None):
-        if seed is None:
-            seed = random.randint(0, 1000000)
-        set_seed(seed)
-        return seed
-
 
 def main():
     # 解析命令行参数
     parser = HfArgumentParser((EvalArguments, ModelArguments))
     eval_args, model_args = parser.parse_args_into_dataclasses()
+    
+    eval_util = EvaluationUtil(**eval_args.__dict__, model_args=model_args)
 
-    eval_util = EvaluationUtil(path = eval_args.path, 
-                            args = model_args, 
-                            task_set=eval_args.task_set, 
-                            mode = eval_args.mode, 
-                            pooler=eval_args.pooler)
-
-    eval_util.eval()
+    result = eval_util.eval()
+    print(result)
 
 
 if __name__ == "__main__":
