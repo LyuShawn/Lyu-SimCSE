@@ -5,6 +5,8 @@ from prettytable import PrettyTable
 import torch
 from transformers import AutoModel, AutoTokenizer
 import json
+import argparse
+from simcse.models import RobertaForCL
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -12,8 +14,7 @@ PATH_TO_DATA = './SentEval/data'
 sys.path.insert(0, PATH_TO_SENTEVAL)
 import senteval
 
-
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 eval_task_list =[
     "STS12",
@@ -42,7 +43,10 @@ def do_eval(
 ):
 
     # load model
-    model = AutoModel.from_pretrained(model_name_or_path)
+    #    model = AutoModel.from_pretrained(model_name_or_path)
+
+    model = RobertaForCL.from_pretrained(model_name_or_path)
+
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
@@ -256,23 +260,10 @@ def calculate_average(task_scores):
         avg_scores[task] = sum(task_scores[task]) / len(task_scores[task])
     return avg_scores
 
-def setup_logger(model_path, epoch):
-    """logger"""
-     # setup log
-    log_path = os.path.join(model_path, "eval_logs")
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
-    log_file = os.path.join(log_path, f"{epoch}.log")
-    # 设置 log
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-    logging.basicConfig(
-        filename=log_file, format="%(asctime)s : %(message)s", level=logging.DEBUG
-    )
 
 def eval(path, times=3, pooler="cls", task_set="sts", mode="test"):
     """推断模型函数入口"""
-    logger.info(
+    logging.info(
         f"start evaluation {path},with times={times},pooler={pooler},task_set={task_set},mode={mode}"
     )
     task_scores = {
@@ -287,7 +278,6 @@ def eval(path, times=3, pooler="cls", task_set="sts", mode="test"):
     }
 
     for index in range(times):
-        setup_logger(path, index)
         result = do_eval(
             model_name_or_path=path,
             pooler=pooler,
@@ -299,6 +289,13 @@ def eval(path, times=3, pooler="cls", task_set="sts", mode="test"):
 
     avg_scores = calculate_average(task_scores)
     scores = {"avg_scores": avg_scores, "task_scores": task_scores}
-    with open(os.path.join(path, "avg_scores.json"), "w") as f:
-        json.dump(scores, f, indent=4, sort_keys=True)
     return scores
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path", type=str, required=True, help="model path")
+
+    args = parser.parse_args()
+    result = eval(path=args.path,times=1)
+    print(result)
