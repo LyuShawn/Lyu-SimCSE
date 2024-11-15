@@ -1,6 +1,7 @@
 from utils.sentence_util import text_encode
 import redis
 import json
+from knowledge.retrieval import retrieve_knowledge
 
 class PrepareFeaturesArgs:
     def __init__(self, tokenizer, data_args, model_args, sent0_cname, sent1_cname, sent2_cname):
@@ -22,7 +23,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
     data_args = args.data_args
     model_args = args.model_args
 
-    total = len(examples[sent0_cname])
+    total = len(examples[sent0_cname])  # 1000
 
     # 避免空值
     for idx in range(total):
@@ -125,5 +126,20 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
     else:
         for key in sent_features:
             features[key] = [[sent_features[key][i], sent_features[key][i+total]] for i in range(total)]
-        
+
+    if args.model_args.do_knowledge_fusion:
+        sent_knowledge_list = []
+        # 如果需要知识融合，对每个原始句子做知识检索，并tokenize
+        for sent in examples[sent0_cname]:
+            knowledge = retrieve_knowledge(sent)
+            sent_knowledge_list.append(knowledge if knowledge else "")
+        sent_knowledge_features = tokenizer(
+            sent_knowledge_list,
+            max_length=256,
+            truncation=True,
+            padding="max_length" if data_args.pad_to_max_length else False,
+        )
+
+        features['sent_knowledge_input_ids'] = sent_knowledge_features['input_ids']
+
     return features

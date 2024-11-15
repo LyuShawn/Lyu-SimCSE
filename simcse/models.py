@@ -16,6 +16,52 @@ from transformers.file_utils import (
 )
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
+class KnowledgeFussion(nn.Module):
+    def __init__(self, attention_dim, knowledge_dim, attention_strength=1.0):
+        super(KnowledgeFussion, self).__init__()
+        self.attention = nn.MultiheadAttention(attention_dim, num_heads=1)
+        self.attention_strength = attention_strength
+        self.knowledge_dim = knowledge_dim
+
+    def forward(self, model_output, 
+                input_ids , 
+                knowledge_output, 
+                empyt_knowledge_mask,
+                knowledge_token_id,
+                mask_token_id):
+        # bs * num_sent, len, hidden
+        # model_output: (bs, len, hidden)
+        # knowledge_output: (bs, hidden)
+        bs, seq_len, hidden_dim = model_output.shape
+
+        origin_output = model_output.clone()    # (bs, len, hidden)
+
+        knowledge_mask = input_ids == knowledge_token_id # (bs, len)
+        knowledge_output = knowledge_output.unsqueeze(1).repeat(2,1,1).expand(-1, seq_len, -1) # (bs, len, hidden)
+        # 根据knowledge_mask，替换掉model_output中的知识部分
+        model_output[knowledge_mask] = knowledge_output[knowledge_mask]
+
+        # Step 2: 计算注意力更新
+        # 为了符合 multi-head attention 的输入要求，需要对模型输出进行转置
+        model_output = model_output.transpose(0, 1)  # 变为 (len, bs, hidden)
+        
+        # 注意力机制：进行 self-attention 更新
+        attn_output, attn_weights = self.attention(model_output, model_output, model_output)  # (len, bs, hidden)
+        
+        # # Step 3: 更新 model_output
+        attn_output = attn_output.transpose(0, 1)  # 转回 (bs, len, hidden)
+        model_output = model_output.transpose(0, 1)  # 转回 (bs, len, hidden)
+
+        # 使用注意力权重来调整模型输出
+        model_output = model_output + self.attention_strength * attn_output
+
+        # 如果没有知识的部分，直接保留原始的 model_output（无变化）
+        empyt_knowledge_mask = empyt_knowledge_mask.repeat(2) # (bs * len)
+        model_output[empyt_knowledge_mask] = origin_output[empyt_knowledge_mask]
+        
+        return model_output[input_ids == mask_token_id] # (bs, hidden)
+
+
 class MLPLayer(nn.Module):
     """
     Head for getting sentence representations over RoBERTa/BERT's CLS representation.
@@ -92,6 +138,10 @@ def cl_init(cls, config):
     if cls.model_args.pooler_type == "cls":
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
+
+    if cls.model_args.do_knowledge_fusion:
+        cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, config.hidden_size, cls.model_args.knowledge_attention_strength)
+
     cls.init_weights()
 
 def cl_forward(cls,
@@ -108,31 +158,8 @@ def cl_forward(cls,
     return_dict=None,
     mlm_input_ids=None,
     mlm_labels=None,
+    sent_knowledge_input_ids=None,
 ):
-    def get_delta(template_token, length=50):
-        with torch.set_grad_enabled(True):
-            device = input_ids.device
-            d_input_ids = torch.Tensor(template_token).repeat(length, 1).to(device).long()
-            d_inputs_embeds = None
-            d_position_ids = torch.arange(d_input_ids.shape[1]).to(device).unsqueeze(0).repeat(length, 1).long()
-            if True:
-                d_position_ids[:, len(cls.model_args.prompt_prefix_input_ids)+1:] += torch.arange(length).to(device).unsqueeze(-1)
-            m_mask = d_input_ids == cls.model_args.mask_token_id
-            outputs = encoder(input_ids=d_input_ids if d_inputs_embeds is None else None ,
-                    inputs_embeds=d_inputs_embeds,
-                    position_ids=d_position_ids,  output_hidden_states=True, return_dict=True)
-            last_hidden = outputs.last_hidden_state
-            delta = last_hidden[m_mask]
-            template_len = d_input_ids.shape[1]
-            if True:
-                delta = cls.mlp(delta)
-            return delta, template_len
-
-    if cls.model_args.do_prompt_denoising:
-        noise, template_len = get_delta(cls.model_args.prompt_token["input_ids"])
-
-        if cls.model_args.prompt_template2:
-            noise2, template_len2 = get_delta(cls.model_args.prompt_token2["input_ids"])
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
     ori_input_ids = input_ids
@@ -179,26 +206,34 @@ def cl_forward(cls,
     # Pooling
 
     if cls.model_args.do_prompt_enhancement:
+        if cls.model_args.do_knowledge_fusion:
+            # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
+            knowledge_output = encoder(
+                sent_knowledge_input_ids,
+                return_dict=True,
+            )
+            knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
+
+            # 计算empty_knowledge_mask
+            bs, len = sent_knowledge_input_ids.shape
+            empty_knowledge_mask = torch.zeros(bs, dtype=torch.bool)    # (bs)
+            for i in range(bs):
+                # 非0元素少于等于2个的句子，认为是空的知识
+                non_zero = sent_knowledge_input_ids[i] != 0
+                if non_zero.sum() <= 2:
+                    empty_knowledge_mask[i] = True
+
+            last_hidden_state = outputs.last_hidden_state   # (bs * num_sent, len, hidden)
+            knowledge_pooler_output = cls.knowledge_fusion(
+                model_output=last_hidden_state,
+                input_ids=input_ids,    # (bs * num_sent, len)
+                knowledge_output = knowledge_output, # (bs, hidden)
+                empyt_knowledge_mask = empty_knowledge_mask, # (bs)
+                knowledge_token_id = cls.model_args.knowledge_token_id,
+                mask_token_id = cls.model_args.mask_token_id)
+            knowledge_pooler_output = knowledge_pooler_output.view(batch_size, num_sent, -1) # (bs, num_sent, hidden)
+
         pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size * num_sent, -1)
-
-        if cls.model_args.do_prompt_denoising:
-            # 去噪
-            blen = attention_mask.sum(-1) - template_len
-            # if cls.model_args.mask_embedding_sentence_org_mlp and not cls.model_args.mlp_only_train:
-            #     pooler_output, delta = cls.mlp(pooler_output), cls.mlp(delta)
-
-            if cls.model_args.prompt_template2:
-                pooler_output = pooler_output.view(batch_size, num_sent, -1)
-                attention_mask = attention_mask.view(batch_size, num_sent, -1)
-                blen = attention_mask.sum(-1) - template_len
-                pooler_output[:, 0, :] -= noise[blen[:, 0]]
-                blen = attention_mask.sum(-1) - template_len2
-                pooler_output[:, 1, :] -= noise2[blen[:, 1]]
-                if num_sent == 3:
-                    pooler_output[:, 2, :] -= noise2[blen[:, 2]]
-            else:
-                pooler_output -=  noise[blen] * cls.model_args.prompt_denoising_weight
-
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
@@ -209,8 +244,17 @@ def cl_forward(cls,
         if cls.pooler_type == "cls":
             pooler_output = cls.mlp(pooler_output)
 
-    # Separate representation
-    z1, z2 = pooler_output[:,0], pooler_output[:,1]
+    if cls.model_args.do_knowledge_fusion:
+        if cls.model_args.knowledge_fusion_type == "full":
+            z1, z2 = knowledge_pooler_output[:,0], knowledge_pooler_output[:,1]
+        elif cls.model_args.knowledge_fusion_type == "selective":
+            z1, z2 = pooler_output[:,0], knowledge_pooler_output[:,1]
+        elif cls.model_args.knowledge_fusion_type == "fusion_loss":
+            z1, z2 = pooler_output[:,0], pooler_output[:,1]
+            z3 = knowledge_pooler_output[:,0]
+            # z1, z2 = pooler_output[:,0], pooler_output[:,1]
+    else:
+        z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
     # Hard negative
     if num_sent == 3:
@@ -300,7 +344,7 @@ def sentemb_forward(
         # 只做表征的时候，不会用到外部知识，所以不需要使用外部知识的prompt
         prompt_prefix_input_ids = torch.tensor(cls.model_args.eval_prefix_input_ids).to(input_ids.device)
         prompt_suffix_input_ids = torch.tensor(cls.model_args.eval_suffix_input_ids).to(input_ids.device)
-
+        # TODO: 这里的拼接方式可能需要调整
         input_ids = torch.cat([prompt_prefix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1), 
                             input_ids, 
                             prompt_suffix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1)], dim=1)
@@ -327,12 +371,14 @@ def sentemb_forward(
     )
 
     if cls.model_args.do_prompt_enhancement:
-        pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id]
+        # 这里会出现bs*2个true，原因是在外面已经拼接了prefix和suffix，这里又拼接了一次
+        mask = input_ids == cls.model_args.mask_token_id
+        pooler_output = outputs.last_hidden_state[mask]    # (bs, hidden)
         pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
-    if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
-        pooler_output = cls.mlp(pooler_output)
+        if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
+            pooler_output = cls.mlp(pooler_output)
 
     if not return_dict:
         return (outputs[0], pooler_output) + outputs[2:]
@@ -371,6 +417,7 @@ class BertForCL(BertPreTrainedModel):
         sent_emb=False,
         mlm_input_ids=None,
         mlm_labels=None,
+        sent_knowledge_input_ids=None,
     ):
         if sent_emb:
             return sentemb_forward(self, self.bert,
@@ -399,6 +446,7 @@ class BertForCL(BertPreTrainedModel):
                 return_dict=return_dict,
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
+                sent_knowledge_input_ids=sent_knowledge_input_ids
             )
 
 

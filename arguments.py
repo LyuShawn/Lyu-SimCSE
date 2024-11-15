@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Literal
 
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
@@ -118,6 +118,7 @@ class ModelArguments:
     )
 
     prompt_template: Optional[str] = field(
+        # 'The phrase \'{sentence}\' may relate to [KNOWLEDGE], thus [MASK] is implied.',
         default='This sentence : \'{sentence}\' means [MASK].',
         metadata={
             "help": "The prompt template."
@@ -159,6 +160,34 @@ class ModelArguments:
         default=False,
         metadata={
             "help": "Whether to use prompt bert mask."
+        }
+    )
+
+    do_knowledge_fusion: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use knowledge fusion."
+        }
+    )
+
+    knowledge_fusion_type: Literal["full","selective","fusion_loss"] = field(
+        default="full",
+        metadata={
+            "help": "The type of knowledge fusion."
+        }
+    )
+
+    knowledge_loss_weight: float = field(
+        default=0.1,
+        metadata={
+            "help": "The weight of knowledge loss."
+        }
+    )
+
+    knowledge_attention_strength: float = field(
+        default=1.0,
+        metadata={
+            "help": "The strength of knowledge attention."
         }
     )
 

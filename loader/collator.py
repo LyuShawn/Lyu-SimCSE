@@ -7,7 +7,7 @@ from transformers.utils import PaddingStrategy
 @dataclass
 class OurDataCollatorWithPadding:
 
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, padding: Union[bool, str, PaddingStrategy] = True, max_length: Optional[int] = None, pad_to_multiple_of: Optional[int] = None, mlm: bool = True, mlm_probability: float = 0.15, do_mlm: bool = True):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, padding: Union[bool, str, PaddingStrategy] = True, max_length: Optional[int] = None, pad_to_multiple_of: Optional[int] = None, mlm: bool = True, mlm_probability: float = 0.15, do_mlm: bool = True, model_args=None):
         self.tokenizer = tokenizer
         self.padding = padding
         self.max_length = max_length
@@ -15,6 +15,8 @@ class OurDataCollatorWithPadding:
         self.mlm = mlm
         self.mlm_probability = mlm_probability
         self.do_mlm = do_mlm
+        self.model_args = model_args
+        
 
     def __call__(self, features: List[Dict[str, Union[List[int], List[List[int]], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         special_keys = ['input_ids', 'attention_mask', 'token_type_ids', 'mlm_input_ids', 'mlm_labels']
@@ -24,6 +26,19 @@ class OurDataCollatorWithPadding:
             num_sent = len(features[0]['input_ids'])
         else:
             return
+
+        if self.model_args.do_knowledge_fusion:
+            # 保存并移除sent_knowledge_intput_ids
+            sent_knowledge_input_ids = []
+            for feature in features:
+                sent_knowledge_input_ids.append(feature.pop('sent_knowledge_input_ids'))
+            sent_knowledge_batch = self.tokenizer.pad(
+                {"input_ids": sent_knowledge_input_ids},
+                padding=self.padding,
+                max_length=self.max_length,
+                pad_to_multiple_of=self.pad_to_multiple_of,
+                return_tensors="pt",
+            )
 
         flat_features = []
         for feature in features:
@@ -37,6 +52,10 @@ class OurDataCollatorWithPadding:
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
+
+        if self.model_args.do_knowledge_fusion:
+            batch['sent_knowledge_input_ids'] = sent_knowledge_batch['input_ids']
+
         if self.do_mlm:
             batch["mlm_input_ids"], batch["mlm_labels"] = self.mask_tokens(batch["input_ids"])
 

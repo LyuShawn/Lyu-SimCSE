@@ -178,14 +178,14 @@ class EvaluationUtil:
 
             sentences = [" ".join(s) for s in batch]
 
-            if self.model_args.do_prompt_enhancement and self.model_args.prompt_template:
-                # 做提示增强，准备prompt
-                template = self.model_args.eval_template if self.model_args.eval_template else self.model_args.prompt_template
-                template = template.replace("[MASK]", tokenizer.mask_token)
+            # if self.model_args.do_prompt_enhancement and self.model_args.prompt_template:
+            #     # 做提示增强，准备prompt
+            #     template = self.model_args.eval_template if self.model_args.eval_template else self.model_args.prompt_template
+            #     template = template.replace("[MASK]", tokenizer.mask_token)
 
-                for i, s in enumerate(sentences):
-                    if len(s) > 0 and s[-1] not in '.?"\'': s += '.'
-                    sentences[i] = template.replace("{sentence}", s).strip()
+            #     for i, s in enumerate(sentences):
+            #         if len(s) > 0 and s[-1] not in '.?"\'': s += '.'
+            #         sentences[i] = template.replace("{sentence}", s).strip()
 
             # Tokenization
             if max_length is not None:
@@ -221,9 +221,10 @@ class EvaluationUtil:
 
             # Apply different poolers
             if self.model_args.do_prompt_enhancement:
-                pooler_output = last_hidden[batch['input_ids'] == tokenizer.mask_token_id]
+                # pooler_output = last_hidden[batch['input_ids'] == tokenizer.mask_token_id]
                 # 如果有应用模板去燥再加
-                return pooler_output.view(batch['input_ids'].shape[0], -1).cpu()
+                # return pooler_output.view(batch['input_ids'].shape[0], -1).cpu()
+                return pooler_output.cpu()
             elif pooler == "cls":
                 # There is a linear+activation layer after CLS representation
                 return pooler_output.cpu()

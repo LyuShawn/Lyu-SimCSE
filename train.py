@@ -127,6 +127,11 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
+    # 添加特殊token
+    if model_args.do_knowledge_fusion:
+        tokenizer.add_special_tokens({'additional_special_tokens': ['[KNOWLEDGE]']})
+        model_args.knowledge_token_id = tokenizer.convert_tokens_to_ids('[KNOWLEDGE]')
+
     # 加载模型
     logger.info("********* Load Model *********")
     if model_args.model_name_or_path:
@@ -158,6 +163,7 @@ def main():
     else:
         raise NotImplementedError
 
+    # 更新tokenizer的词表大小
     model.resize_token_embeddings(len(tokenizer))
 
     # 数据tokenize
@@ -239,7 +245,7 @@ def main():
         data_collator = default_data_collator
     else:
         # 否则使用自定义的collator，传入tokenizer
-        data_collator = OurDataCollatorWithPadding(tokenizer=tokenizer, mlm_probability=data_args.mlm_probability, do_mlm=model_args.do_mlm)
+        data_collator = OurDataCollatorWithPadding(tokenizer=tokenizer, mlm_probability=data_args.mlm_probability, do_mlm=model_args.do_mlm, model_args=model_args)
 
     trainer = CLTrainer(
         model=model,
