@@ -337,7 +337,7 @@ class OurTrainingArguments(TrainingArguments):
     )
     
     load_best_model_at_end: Optional[bool] = field(
-        default=False,
+        default=True,
         metadata={"help": "Whether or not to load the best model found during training at the end of training."},
     )
     

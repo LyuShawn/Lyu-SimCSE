@@ -150,7 +150,7 @@ def cl_init(cls, config):
 
     if cls.model_args.do_knowledge_fusion:
         cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
-                                                cls.model_args)
+                                                cls.model_args).to(cls.device)
 
     cls.init_weights()
 
@@ -226,7 +226,7 @@ def cl_forward(cls,
 
             # 计算empty_knowledge_mask
             bs, len = sent_knowledge_input_ids.shape
-            empty_knowledge_mask = torch.zeros(bs, dtype=torch.bool)    # (bs)
+            empty_knowledge_mask = torch.zeros(bs, dtype=torch.bool).to(sent_knowledge_input_ids.device)   # (bs)
             for i in range(bs):
                 # 非0元素少于等于2个的句子，认为是空的知识
                 non_zero = sent_knowledge_input_ids[i] != 0
