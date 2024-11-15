@@ -27,7 +27,7 @@ class KnowledgeFussion(nn.Module):
                                                 dropout=model_args.knowledge_attention_dropout)
 
         if model_args.freeze_attention_strength:
-            self.attention_strength = model_args.attention_strength
+            self.attention_strength = model_args.knowledge_attention_strength
         else:
             self.attention_strength = nn.Parameter(torch.tensor(model_args.knowledge_attention_strength))
 
