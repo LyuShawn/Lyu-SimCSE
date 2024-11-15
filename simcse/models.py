@@ -17,11 +17,20 @@ from transformers.file_utils import (
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
 class KnowledgeFussion(nn.Module):
-    def __init__(self, attention_dim, knowledge_dim, attention_strength=1.0):
+    def __init__(self, hidden_dim, model_args):
         super(KnowledgeFussion, self).__init__()
-        self.attention = nn.MultiheadAttention(attention_dim, num_heads=1)
-        self.attention_strength = attention_strength
-        self.knowledge_dim = knowledge_dim
+
+        self.model_args = model_args
+
+        self.attention = nn.MultiheadAttention(hidden_dim, 
+                                                num_heads=model_args.knowledge_attention_head_num, 
+                                                dropout=model_args.dropout)
+
+        if model_args.freeze_attention_strength:
+            self.attention_strength = model_args.attention_strength
+        else:
+            self.attention_strength = nn.Parameter(torch.tensor(model_args.knowledge_attention_strength))
+
 
     def forward(self, model_output, 
                 input_ids , 
@@ -140,7 +149,8 @@ def cl_init(cls, config):
     cls.sim = Similarity(temp=cls.model_args.temp)
 
     if cls.model_args.do_knowledge_fusion:
-        cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, config.hidden_size, cls.model_args.knowledge_attention_strength)
+        cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
+                                                cls.model_args)
 
     cls.init_weights()
 
@@ -303,6 +313,11 @@ def cl_forward(cls,
         cos_sim = cos_sim + weights
 
     loss = loss_fct(cos_sim, labels)
+
+    if cls.model_args.do_knowledge_fusion and cls.model_args.knowledge_fusion_type == "fusion_loss":
+        knowledge_sim = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
+        fusion_loss = loss_fct(knowledge_sim, labels)
+        loss = loss + cls.model_args.knowledge_loss_weight * fusion_loss
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:

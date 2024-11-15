@@ -191,6 +191,20 @@ class ModelArguments:
         }
     )
 
+    knowledge_attention_head_num: int = field(
+        default=1,
+        metadata={
+            "help": "The number of knowledge attention heads."
+        }
+    )
+
+    freeze_attention_strength: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to freeze attention strength."
+        }
+    )
+
 
 @dataclass
 class DataTrainingArguments:
