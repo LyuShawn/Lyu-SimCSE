@@ -24,7 +24,7 @@ class KnowledgeFussion(nn.Module):
 
         self.attention = nn.MultiheadAttention(hidden_dim, 
                                                 num_heads=model_args.knowledge_attention_head_num, 
-                                                dropout=model_args.dropout)
+                                                dropout=model_args.knowledge_attention_dropout)
 
         if model_args.freeze_attention_strength:
             self.attention_strength = model_args.attention_strength

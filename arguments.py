@@ -205,6 +205,13 @@ class ModelArguments:
         }
     )
 
+    knowledge_attention_dropout: float = field(
+        default=0.0,
+        metadata={
+            "help": "The dropout of knowledge attention."
+        }
+    )
+
 
 @dataclass
 class DataTrainingArguments:
