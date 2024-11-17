@@ -203,6 +203,7 @@ def cl_forward(cls,
     mlm_input_ids=None,
     mlm_labels=None,
     sent_knowledge=None,
+    knowledge_encoder=None,
 ):
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
@@ -252,7 +253,7 @@ def cl_forward(cls,
     if cls.model_args.do_prompt_enhancement:
         if cls.model_args.do_knowledge_fusion:
             # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
-            knowledge_output = encoder(
+            knowledge_output = knowledge_encoder(
                 **sent_knowledge,
                 return_dict=True,
             )
@@ -428,6 +429,9 @@ class BertForCL(BertPreTrainedModel):
         if self.model_args.do_mlm:
             self.lm_head = BertLMPredictionHead(config)
 
+        if self.model_args.do_knowledge_fusion:
+            self.knowledge_encoder = BertModel(config, add_pooling_layer=False)
+
         cl_init(self, config)
 
     def forward(self,
@@ -473,7 +477,8 @@ class BertForCL(BertPreTrainedModel):
                 return_dict=return_dict,
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
-                sent_knowledge=sent_knowledge
+                sent_knowledge=sent_knowledge,
+                knowledge_encoder=self.knowledge_encoder,
             )
 
 
