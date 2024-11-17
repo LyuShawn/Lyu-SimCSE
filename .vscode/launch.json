@@ -26,7 +26,7 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                // "--overwrite_cache",
+                "--overwrite_cache",
                 // "--do_prompt_enhancement",
                 "--sample_data","10000",
                 "--do_knowledge_fusion",
@@ -37,6 +37,7 @@
                 // "--prompt_template", "This sentence of '{sentence}' may about {title}, so it means [MASK].",
                 // "--eval_template", "This sentence : '{sentence}' means [MASK].",
                 // "--mask_prompt"
+                "--knowledge_retrieve_type", "summary",
             ],
             "justMyCode": false
         },

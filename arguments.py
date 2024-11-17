@@ -219,6 +219,13 @@ class ModelArguments:
         }
     )
 
+    knowledge_retrieve_type: Literal["title","summary"] = field(
+        default="title",
+        metadata={
+            "help": "The type of knowledge fusion."
+        }
+    )
+
 @dataclass
 class DataTrainingArguments:
     """

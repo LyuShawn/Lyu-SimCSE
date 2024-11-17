@@ -137,7 +137,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         sent_knowledge_list = []
         # 如果需要知识融合，对每个原始句子做知识检索，并tokenize
         for sent in examples[sent0_cname]:
-            knowledge = retrieve_knowledge(sent)
+            knowledge = retrieve_knowledge(sent, args.model_args.knowledge_retrieve_type)
             sent_knowledge_list.append(knowledge if knowledge else "")
         sent_knowledge_features = tokenizer(
             sent_knowledge_list,
