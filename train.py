@@ -122,10 +122,10 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
-    # 添加特殊token
-    if model_args.do_knowledge_fusion:
-        tokenizer.add_special_tokens({'additional_special_tokens': ['[KNOWLEDGE]']})
-        model_args.knowledge_token_id = tokenizer.convert_tokens_to_ids('[KNOWLEDGE]')
+    # # 添加特殊token
+    # if model_args.do_knowledge_fusion:
+    #     tokenizer.add_special_tokens({'additional_special_tokens': ['[KNOWLEDGE]']})
+    #     model_args.knowledge_token_id = tokenizer.convert_tokens_to_ids('[KNOWLEDGE]')
 
     # 加载模型
     logger.info("********* Load Model *********")

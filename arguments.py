@@ -212,6 +212,12 @@ class ModelArguments:
         }
     )
 
+    knowledge_encoder:bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use knowledge encoder."
+        }
+    )
 
 @dataclass
 class DataTrainingArguments:

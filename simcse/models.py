@@ -105,6 +105,65 @@ class KnowledgeFussion(nn.Module):
         
         return model_output[input_ids == mask_token_id] # (bs, hidden)
 
+class CrossAttentionLayer(nn.Module):
+    def __init__(self, hidden_dim, num_heads, dropout=0.1):
+        """
+        初始化交叉注意力机制层
+        :param hidden_dim: 特征维度 (BERT 隐藏层大小)
+        :param num_heads: 注意力头数
+        :param dropout: 注意力的dropout比率
+        """
+        super(CrossAttentionLayer, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        self.attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=num_heads, dropout=dropout)
+        self.layer_norm = nn.LayerNorm(hidden_dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, sentence_output, knowledge_emb, empty_knowledge_mask):
+        """
+        前向传播
+        :param sentence_output: (bs, seq_len, hidden_dim) 句子的 BERT 表征
+        :param knowledge_emb: (bs, knowledge_num, hidden_dim) 句子相关的知识表征
+        :param empty_knowledge_mask: (bs,) 是否不更新句子表征的掩码
+        :return: (bs, seq_len, hidden_dim) 更新后的句子表征
+        """
+        bs, seq_len, hidden_dim = sentence_output.size()
+        knowledge_num = knowledge_emb.size(1)
+
+        # 转换维度以匹配 MultiheadAttention 的输入格式 (seq_len, bs, hidden_dim)
+        sentence_output = sentence_output.transpose(0, 1)  # (seq_len, bs, hidden_dim)
+        knowledge_emb = knowledge_emb.transpose(0, 1)      # (knowledge_num, bs, hidden_dim)
+
+        # Query = 句子表征, Key/Value = 知识表征
+        attn_output, _ = self.attention(query=sentence_output, key=knowledge_emb, value=knowledge_emb)
+
+        # 残差连接 + LayerNorm
+        sentence_output = self.layer_norm(sentence_output + self.dropout(attn_output))
+
+        # 前馈网络 + 残差连接 + LayerNorm
+        ffn_output = self.ffn(sentence_output)
+        updated_sentence_output = self.layer_norm(sentence_output + self.dropout(ffn_output))
+
+        # 转回原始形状 (bs, seq_len, hidden_dim)
+        updated_sentence_output = updated_sentence_output.transpose(0, 1)
+
+        # 使用 empty_knowledge_mask 进行选择性更新
+        # 如果 empty_knowledge_mask 为 True, 保持原始句子表征
+        updated_sentence_output = torch.where(
+            empty_knowledge_mask.unsqueeze(1).unsqueeze(2),  # (bs, 1, 1)
+            sentence_output.transpose(0, 1),  # 原始句子表征 (bs, seq_len, hidden_dim)
+            updated_sentence_output  # 更新后的表征
+        )
+
+        return updated_sentence_output
+
 class MLPLayer(nn.Module):
     """
     Head for getting sentence representations over RoBERTa/BERT's CLS representation.
@@ -183,8 +242,11 @@ def cl_init(cls, config):
     cls.sim = Similarity(temp=cls.model_args.temp)
 
     if cls.model_args.do_knowledge_fusion:
-        cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
-                                                cls.model_args).to(cls.device)
+        # cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
+        #                                         cls.model_args).to(cls.device)
+        cls.knowledge_fusion = CrossAttentionLayer(config.hidden_size, 
+                                                    cls.model_args.knowledge_attention_head_num, 
+                                                    cls.model_args.knowledge_attention_dropout).to(cls.device)
 
     cls.init_weights()
 
@@ -203,7 +265,6 @@ def cl_forward(cls,
     mlm_input_ids=None,
     mlm_labels=None,
     sent_knowledge=None,
-    knowledge_encoder=None,
 ):
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
@@ -253,10 +314,16 @@ def cl_forward(cls,
     if cls.model_args.do_prompt_enhancement:
         if cls.model_args.do_knowledge_fusion:
             # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
-            knowledge_output = knowledge_encoder(
-                **sent_knowledge,
-                return_dict=True,
-            )
+            if cls.knowledge_encoder is not None:
+                knowledge_output = cls.knowledge_encoder(
+                    **sent_knowledge,
+                    return_dict=True,
+                )
+            else:
+                knowledge_output = encoder(
+                    **sent_knowledge,
+                    return_dict=True,
+                )
             # 对knowledge_output进行pooling
             knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
 
@@ -276,7 +343,7 @@ def cl_forward(cls,
                 input_ids=sent_input_ids,    # (bs , len)
                 knowledge_output = knowledge_output, # (bs, hidden)
                 empyt_knowledge_mask = empty_knowledge_mask, # (bs)
-                knowledge_token_id = cls.model_args.knowledge_token_id,
+                # knowledge_token_id = cls.model_args.knowledge_token_id,
                 mask_token_id = cls.model_args.mask_token_id)
 
         pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size * num_sent, -1)
@@ -291,15 +358,55 @@ def cl_forward(cls,
             pooler_output = cls.mlp(pooler_output)
 
     if cls.model_args.do_knowledge_fusion:
+
+        # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
+        if cls.knowledge_encoder is not None:
+            knowledge_output = cls.knowledge_encoder(
+                **sent_knowledge,
+                return_dict=True,
+            )
+        else:
+            knowledge_output = encoder(
+                **sent_knowledge,
+                return_dict=True,
+            )
+
+        # 对knowledge_output进行pooling
+        knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
+        knowledge_output = knowledge_output.unsqueeze(1) # (bs, 1, hidden)
+
+        # 计算empty_knowledge_mask
+        non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
+        empty_knowledge_mask = non_zero_count <= 2
+
+        last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
+
         if cls.model_args.knowledge_fusion_type == "full":
-            raise NotImplementedError
-            # z1, z2 = knowledge_pooler_output[:,0], knowledge_pooler_output[:,1]
+            z1 = cls.knowledge_fusion(
+                sentence_output=last_hidden_state[:,0,:],    # (bs, len, hidden)
+                knowledge_emb=knowledge_output, # (bs, hidden)
+                empty_knowledge_mask=empty_knowledge_mask)
+            z2 = cls.knowledge_fusion(
+                sentence_output=last_hidden_state[:,1,:],    # (bs, len, hidden)
+                knowledge_emb=knowledge_output, # (bs, hidden)
+                empty_knowledge_mask=empty_knowledge_mask)
         elif cls.model_args.knowledge_fusion_type == "selective":
-            z1, z2 = pooler_output[:,0], mask_attn_output + pooler_output[:,1]
+            # z1, z2 = pooler_output[:,0], mask_attn_output + pooler_output[:,1]
+            z1 = last_hidden_state[:,0,:]
+            z2 = cls.knowledge_fusion(
+                sentence_output=last_hidden_state[:,1,:],    # (bs, len, hidden)
+                knowledge_emb=knowledge_output, # (bs, hidden)
+                empty_knowledge_mask=empty_knowledge_mask)
         elif cls.model_args.knowledge_fusion_type == "fusion_loss":
-            z1, z2 = pooler_output[:,0], pooler_output[:,1]
-            z3 = mask_attn_output
-            # z1, z2 = pooler_output[:,0], pooler_output[:,1]
+            z1, z2 = last_hidden_state[:,0,:], last_hidden_state[:,1,:]
+            z3 = cls.knowledge_fusion(
+                sentence_output=last_hidden_state[:,0,:],    # (bs, len, hidden)
+                knowledge_emb=knowledge_output, # (bs, hidden)
+                empty_knowledge_mask=empty_knowledge_mask)
+            z3 = z3[:,0,:]
+        z1 = z1[:,0,:]
+        z2 = z2[:,0,:]
+        
     else:
         z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
@@ -430,7 +537,10 @@ class BertForCL(BertPreTrainedModel):
             self.lm_head = BertLMPredictionHead(config)
 
         if self.model_args.do_knowledge_fusion:
-            self.knowledge_encoder = BertModel(config, add_pooling_layer=False)
+            if self.model_args.knowledge_encoder:
+                self.knowledge_encoder = BertModel(config, add_pooling_layer=False)
+            else:
+                self.knowledge_encoder = None
 
         cl_init(self, config)
 
@@ -477,8 +587,7 @@ class BertForCL(BertPreTrainedModel):
                 return_dict=return_dict,
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
-                # sent_knowledge=sent_knowledge,
-                # knowledge_encoder=self.knowledge_encoder,
+                sent_knowledge=sent_knowledge,
             )
 
 
