@@ -257,7 +257,7 @@ def cl_forward(cls,
                 return_dict=True,
             )
             # 对knowledge_output进行pooling
-            knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
+            knowledge_output = knowledge_output.last_hidden_state[:, 1, :]  # (bs, hidden)
 
             # 计算empty_knowledge_mask
             non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
