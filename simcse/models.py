@@ -265,10 +265,10 @@ def cl_forward(cls,
 
             last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
             # 取一半
-            last_hidden_state = last_hidden_state[:,0,:]    # (bs, len, hidden)
+            last_hidden_state = last_hidden_state[:,1,:]    # (bs, len, hidden)
 
             # 原ori_input_ids取一半
-            sent_input_ids = ori_input_ids[:,1,:]    # (bs, len)
+            sent_input_ids = ori_input_ids[:,0,:]    # (bs, len)
             # 进行知识融合  (bs, hidden)
             mask_attn_output = cls.knowledge_fusion(
                 model_output=last_hidden_state,
