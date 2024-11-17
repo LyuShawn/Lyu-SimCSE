@@ -33,7 +33,7 @@
                 "--prompt_template", "The phrase '{sentence}' may relate to [KNOWLEDGE], thus [MASK] is implied.",
                 "--per_device_train_batch_size", "32",
                 "--eval_steps", "25",
-                "--knowledge_fusion_type", "fusion_loss",
+                "--knowledge_fusion_type", "selective",
                 // "--prompt_template", "This sentence of '{sentence}' may about {title}, so it means [MASK].",
                 "--eval_template", "This sentence : '{sentence}' means [MASK].",
                 // "--mask_prompt"

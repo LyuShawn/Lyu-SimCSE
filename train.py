@@ -43,11 +43,6 @@ def main():
             "Use --overwrite_output_dir to overcome."
         )
 
-    # Setup logging
-    # logging.basicConfig(level=logging.INFO)
-    # logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
-
-
     exp_name = training_args.output_dir.split('/')[-1]
 
     # wandb
@@ -208,7 +203,7 @@ def main():
             model_args.eval_prefix_input_ids = model_args.prompt_prefix_input_ids
             model_args.eval_suffix_input_ids = model_args.prompt_suffix_input_ids
 
-        model_args.prompt_token = tokenizer(model_args.prompt_prefix + model_args.prompt_suffix)
+        # model_args.prompt_token = tokenizer(model_args.prompt_prefix + model_args.prompt_suffix)
 
         if model_args.prompt_template2:
             template2 = model_args.prompt_template2.replace('[MASK]', tokenizer.mask_token)

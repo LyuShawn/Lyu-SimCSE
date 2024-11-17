@@ -267,7 +267,7 @@ class DataTrainingArguments:
         metadata={"help": "The training data file (.txt or .csv)."}
     )
     max_seq_length: Optional[int] = field(
-        default=32,
+        default=64,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated."
