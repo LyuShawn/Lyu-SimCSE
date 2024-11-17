@@ -477,8 +477,8 @@ class BertForCL(BertPreTrainedModel):
                 return_dict=return_dict,
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
-                sent_knowledge=sent_knowledge,
-                knowledge_encoder=self.knowledge_encoder,
+                # sent_knowledge=sent_knowledge,
+                # knowledge_encoder=self.knowledge_encoder,
             )
 
 
