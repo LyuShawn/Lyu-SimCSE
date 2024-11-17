@@ -81,7 +81,7 @@ class KnowledgeFussion(nn.Module):
         mask_output = mask_output + self.attention_strength * attn_output
 
         # 如果没有知识的部分，直接保留原始的 model_output（无变化）
-        mask_output[empyt_knowledge_mask] = origin_mask_output[empyt_knowledge_mask]
+        mask_output = torch.where(empyt_knowledge_mask.unsqueeze(-1), origin_mask_output, mask_output)
 
         return mask_output  # (bs, hidden)
 
