@@ -259,6 +259,8 @@ def cl_forward(cls,
             # 对knowledge_output进行pooling
             knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
 
+            mask_attn_output = knowledge_output * cls.model_args.knowledge_attention_strength
+
             # 计算empty_knowledge_mask
             non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
             empty_knowledge_mask = non_zero_count <= 2
@@ -270,13 +272,13 @@ def cl_forward(cls,
             # 原ori_input_ids取一半
             sent_input_ids = ori_input_ids[:,0,:]    # (bs, len)
             # 进行知识融合  (bs, hidden)
-            mask_attn_output = cls.knowledge_fusion(
-                model_output=last_hidden_state,
-                input_ids=sent_input_ids,    # (bs , len)
-                knowledge_output = knowledge_output, # (bs, hidden)
-                empyt_knowledge_mask = empty_knowledge_mask, # (bs)
-                knowledge_token_id = cls.model_args.knowledge_token_id,
-                mask_token_id = cls.model_args.mask_token_id)
+            # mask_attn_output = cls.knowledge_fusion(
+            #     model_output=last_hidden_state,
+            #     input_ids=sent_input_ids,    # (bs , len)
+            #     knowledge_output = knowledge_output, # (bs, hidden)
+            #     empyt_knowledge_mask = empty_knowledge_mask, # (bs)
+            #     knowledge_token_id = cls.model_args.knowledge_token_id,
+            #     mask_token_id = cls.model_args.mask_token_id)
 
         pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id].view(batch_size * num_sent, -1)
     else:
@@ -294,7 +296,7 @@ def cl_forward(cls,
             raise NotImplementedError
             # z1, z2 = knowledge_pooler_output[:,0], knowledge_pooler_output[:,1]
         elif cls.model_args.knowledge_fusion_type == "selective":
-            z1, z2 = pooler_output[:,0], mask_attn_output
+            z1, z2 = pooler_output[:,0], mask_attn_output + pooler_output[:,1]
         elif cls.model_args.knowledge_fusion_type == "fusion_loss":
             z1, z2 = pooler_output[:,0], pooler_output[:,1]
             z3 = mask_attn_output
