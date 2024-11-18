@@ -58,7 +58,9 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
             knowledge_mark = "{knowledge}"
             if knowledge_mark in model_args.prompt_template:
-                knowledge = retrieve_knowledge(s, retrieve_type=args.model_args.knowledge_retrieve_type,max_length = args.model_args.knowledge_max_length)
+                knowledge = retrieve_knowledge(s, 
+                                            retrieve_type=args.model_args.knowledge_retrieve_type,
+                                            max_length = args.model_args.knowledge_max_length)
                 if knowledge:
                     template = model_args.prompt_template.replace(knowledge_mark, knowledge)
                 else:

@@ -27,6 +27,10 @@ class OurDataCollatorWithPadding:
         else:
             return
 
+        if self.model_args.batch_inner_shuffle:
+            import random
+            random.shuffle(features)
+
         if self.model_args.do_knowledge_fusion:
             # 保存并移除sent_knowledge_intput_ids
             sent_knowledge_input_ids = [item.pop('sent_knowledge') for item in features]

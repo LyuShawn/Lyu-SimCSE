@@ -2,7 +2,7 @@ from knowledge.backend import RedisClient
 from utils.sentence_util import text_encode
 import json
 
-def retrieve_knowledge(sent, retrieve_type = 'title', max_length = 256):
+def retrieve_knowledge(sent, retrieve_type = 'title', max_length = -1):
     """
         文本明文，返回知识库中的知识明文
     """
@@ -30,7 +30,10 @@ def retrieve_knowledge(sent, retrieve_type = 'title', max_length = 256):
             key = page_prifix + str(page_id)
             value = redis_client.get(key)
             summary = json.loads(value)["summary"]
-            summary = summary.split()[:max_length]
-            return " ".join(summary)
+            if max_length == -1:
+                return summary
+            else:
+                summary = summary.split()[0:max_length]
+                return " ".join(summary)
     except Exception as e:
         return None

@@ -233,6 +233,13 @@ class ModelArguments:
         }
     )
 
+    batch_inner_shuffle: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to shuffle inner batch."
+        }
+    )
+
 @dataclass
 class DataTrainingArguments:
     """
