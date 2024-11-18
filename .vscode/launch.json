@@ -26,18 +26,16 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                "--overwrite_cache",
-                // "--do_prompt_enhancement",
+                // "--overwrite_cache",
+                "--do_prompt_enhancement",
                 "--sample_data","10000",
-                "--do_knowledge_fusion",
-                // "--prompt_template", "The phrase '{sentence}' may relate to [KNOWLEDGE], thus [MASK] is implied.",
+                "--prompt_template", "The statement '{sentence}' could refer to {knowledge}, implying that [MASK].",
                 "--per_device_train_batch_size", "32",
                 "--eval_steps", "25",
                 "--knowledge_fusion_type", "full",
-                // "--prompt_template", "This sentence of '{sentence}' may about {title}, so it means [MASK].",
-                // "--eval_template", "This sentence : '{sentence}' means [MASK].",
-                // "--mask_prompt"
+                "--eval_template", "This sentence : '{sentence}' means [MASK].",
                 "--knowledge_retrieve_type", "summary",
+                "--knowledge_max_length", "32"
             ],
             "justMyCode": false
         },

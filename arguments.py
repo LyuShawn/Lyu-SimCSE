@@ -226,6 +226,13 @@ class ModelArguments:
         }
     )
 
+    knowledge_max_length: int = field(
+        default=256,
+        metadata={
+            "help": "The max length of knowledge."
+        }
+    )
+
 @dataclass
 class DataTrainingArguments:
     """

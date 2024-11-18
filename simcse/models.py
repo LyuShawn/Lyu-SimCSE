@@ -475,22 +475,27 @@ def sentemb_forward(
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
     if cls.model_args.do_prompt_enhancement:
-
         # 只做表征的时候，不会用到外部知识，所以不需要使用外部知识的prompt
         prompt_prefix_input_ids = torch.tensor(cls.model_args.eval_prefix_input_ids).to(input_ids.device)
         prompt_suffix_input_ids = torch.tensor(cls.model_args.eval_suffix_input_ids).to(input_ids.device)
-        # TODO: 这里的拼接方式可能需要调整
-        input_ids = torch.cat([prompt_prefix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1), 
-                            input_ids, 
-                            prompt_suffix_input_ids.unsqueeze(0).expand(input_ids.size(0), -1)], dim=1)
+        # 拼接prompt和input_ids，去除input_ids末尾的pad
+        non_pad_lengths = (input_ids != cls.model_args.pad_token_id).sum(dim=1)  # 每个句子的非 PAD token 长度
+        # 移除末尾的 pad
+        trimmed_input_ids = [input[:length] for input, length in zip(input_ids, non_pad_lengths)]
+        # 拼接 prefix、trimmed input 和 suffix
+        concatenated_input_ids = [
+            torch.cat([prompt_prefix_input_ids, trimmed_input, prompt_suffix_input_ids], dim=0)
+            for trimmed_input in trimmed_input_ids
+        ]
+        ml = max(input.size(0) for input in concatenated_input_ids)
+        input_ids = torch.stack([
+            torch.cat([input, torch.full((ml - input.size(0),), cls.model_args.pad_token_id, device=input_ids.device)])
+            for input in concatenated_input_ids
+        ])
 
-        if cls.model_args.mask_prompt:
-            # 拼接出新的attention_mask，将prompt部分的attention_mask设置为1，prefix和suffix部分设置为0
-            attention_mask = torch.cat([torch.zeros(input_ids.size(0), prompt_prefix_input_ids.size(0)).to(input_ids.device), 
-                                        attention_mask,
-                                        torch.zeros(input_ids.size(0), prompt_suffix_input_ids.size(0)).to(input_ids.device)], dim=1)
-        else:
-            attention_mask = torch.ones_like(input_ids)
+        # 生成attentionmask
+        attention_mask = torch.zeros_like(input_ids)
+        attention_mask[input_ids != cls.model_args.pad_token_id] = 1
 
         token_type_ids = None
     outputs = encoder(
@@ -507,9 +512,8 @@ def sentemb_forward(
 
     if cls.model_args.do_prompt_enhancement:
         # 这里会出现bs*2个true，原因是在外面已经拼接了prefix和suffix，这里又拼接了一次
-        mask = input_ids == cls.model_args.mask_token_id
-        pooler_output = outputs.last_hidden_state[mask]    # (bs, hidden)
-        pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)
+        pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id]    # (bs, hidden)
+        # pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)   # 出现多个mask 取平均 不会出现
     else:
         pooler_output = cls.pooler(attention_mask, outputs)
         if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:

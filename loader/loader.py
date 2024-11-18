@@ -1,5 +1,4 @@
 from utils.sentence_util import text_encode
-import redis
 import json
 from knowledge.retrieval import retrieve_knowledge
 
@@ -41,10 +40,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 examples[sent2_cname][idx] = " "
         sentences += examples[sent2_cname]
 
-    if "{title}" in model_args.prompt_template:
-        r = redis.Redis(host='59.77.134.205', port=6379, db=0, password='lyuredis579')
-
-
     if model_args.do_prompt_enhancement:
         sent_features = {}
         prompt_prefix_input_ids = model_args.prompt_prefix_input_ids
@@ -61,19 +56,12 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         attention_mask = []
         for i,s in enumerate(sentences):
 
-            if "{title}" in model_args.prompt_template:
-                info = r.get(f"wikisearch:{text_encode(s)}")
-                use_title = False
-                if info:
-                    info = json.loads(info)
-                    if len(info) > 0:
-                        title_list = [item['title'] for item in info]
-                        if model_args.page_title_num != -1:
-                            title_list = title_list[:model_args.page_title_num]
-                        title_str = ", ".join(title_list)
-                        template = model_args.prompt_template.replace("{title}", title_str)
-                        use_title = True
-                if not use_title:
+            knowledge_mark = "{knowledge}"
+            if knowledge_mark in model_args.prompt_template:
+                knowledge = retrieve_knowledge(s, retrieve_type=args.model_args.knowledge_retrieve_type,max_length = args.model_args.knowledge_max_length)
+                if knowledge:
+                    template = model_args.prompt_template.replace(knowledge_mark, knowledge)
+                else:
                     template = model_args.eval_template
 
                 prompt_prefix = template.split("{sentence}")[0]
@@ -101,19 +89,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 attention_mask.append([1] * (len(prompt_prefix_input_ids) + len(s['input_ids']) + len(prompt_suffix_input_ids)))
 
         sent_features['input_ids'] = input_ids
-
-        # 不做对齐，在collator里做batch内对齐
-        # ml = max([len(i) for i in sent_features['input_ids']])
-        # # 对齐
-        # for i in range(len(sent_features['input_ids'])):
-        #     t = sent_features['input_ids'][i]
-        #     sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
-        #     if model_args.mask_prompt:
-        #         # 按前面的attention_mask补0到ml
-        #         attention_mask[i] = attention_mask[i] + [0] * (ml-len(attention_mask[i]))
-        #     else:
-        #         # 不用管prompt，全关注
-        #         attention_mask.append(len(t)*[1] + (ml-len(t))*[0])
 
         sent_features['attention_mask'] = attention_mask
 
