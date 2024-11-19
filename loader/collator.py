@@ -50,13 +50,6 @@ class OurDataCollatorWithPadding:
             for i in range(num_sent):
                 flat_features.append({k: feature[k][i] if k in special_keys else feature[k] for k in feature})
 
-        # batch = self.tokenizer.pad(
-        #     flat_features,
-        #     padding=self.padding,
-        #     max_length=self.max_length,
-        #     pad_to_multiple_of=self.pad_to_multiple_of,
-        #     return_tensors="pt",
-        # )
 
         input_ids = [f['input_ids'] for f in flat_features]
         attention_mask = [f['attention_mask'] for f in flat_features]

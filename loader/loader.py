@@ -33,6 +33,26 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
     sentences = examples[sent0_cname] + examples[sent1_cname]
 
+    if model_args.knowledge_hard_negative:
+        knowledge_hard_sent_list = []
+        threshold = 0.9
+        for s in examples[sent0_cname]:
+            knowledge_sent_list = retrieve_knowledge(s, retrieve_type='sentence') # [(cos_sim, sent)]
+            knowledge_hard_sent = ""
+            if knowledge_sent_list:
+                # 选择相似度小于0.9的最大的句子
+                knowledge_sent_list = [(cos_sim, sent) for cos_sim, sent in knowledge_sent_list if cos_sim < threshold]
+                if knowledge_sent_list:
+                    knowledge_sent_list.sort(key=lambda x: x[0], reverse=True)
+                    knowledge_hard_sent = knowledge_sent_list[0][1]
+            knowledge_hard_sent_list.append(knowledge_hard_sent)
+        sentences += knowledge_hard_sent_list
+        template = model_args.eval_template
+        eval_prefix = template.split("{sentence}")[0]
+        eval_suffix = template.split("{sentence}")[1]
+        eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids'][0:-1]
+        eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
+
     # 如果有第三个句子
     if sent2_cname is not None:
         for idx in range(total):
@@ -68,8 +88,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
                 prompt_prefix = template.split("{sentence}")[0]
                 prompt_suffix = template.split("{sentence}")[1]
-                prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
-                prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
+                prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids'][0:-1]   # 去掉[SEP]
+                prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids'][1:] # 去掉[CLS]
 
             # 处理拼接input_ids
             if i < total:
@@ -80,18 +100,20 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
                 input_ids.append(prompt_prefix_input_ids2 + s['input_ids'] + prompt_suffix_input_ids2)
             else:
-                s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-                input_ids.append(prompt_prefix_input_ids2 + s['input_ids'] + prompt_suffix_input_ids2)
+                if not s:
+                    input_ids.append([])
+                else:
+                    s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
+                    input_ids.append(eval_prefix_input_ids + s['input_ids'] + eval_suffix_input_ids)
 
             if model_args.mask_prompt:
                 # mask prompt，prompt是0
                 attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
             else:
                 # 不mask prompt，全关注
-                attention_mask.append([1] * (len(prompt_prefix_input_ids) + len(s['input_ids']) + len(prompt_suffix_input_ids)))
+                attention_mask.append([1] * len(input_ids[-1])) # 用刚刚拼接的input_ids长度
 
         sent_features['input_ids'] = input_ids
-
         sent_features['attention_mask'] = attention_mask
 
     else:
@@ -103,14 +125,14 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         )
 
     features = {}
-    if sent2_cname is not None:
+    if model_args.knowledge_hard_negative:
         for key in sent_features:
             features[key] = [[sent_features[key][i], sent_features[key][i+total], sent_features[key][i+total*2]] for i in range(total)]
     else:
         for key in sent_features:
             features[key] = [[sent_features[key][i], sent_features[key][i+total]] for i in range(total)]
 
-    if args.model_args.do_knowledge_fusion:
+    if model_args.do_knowledge_fusion:
         sent_knowledge_list = []
         # 如果需要知识融合，对每个原始句子做知识检索，并tokenize
         for sent in examples[sent0_cname]:

@@ -2,25 +2,24 @@ import redis
 
 class SingletonMeta(type):
     _instances = {}
-    
+
     def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
+        # 将初始化参数作为实例的唯一标识
+        key = (cls, args, frozenset(kwargs.items()))
+        if key not in cls._instances:
             instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
+            cls._instances[key] = instance
+        return cls._instances[key]
 
 class RedisClient(metaclass=SingletonMeta):
 
-    host = '59.77.134.205'
-    port = 6379
-    db = 0
     password = 'lyuredis579'
 
-    def __init__(self):
+    def __init__(self, host='59.77.134.205', port=6379, db=0):
         self._connection = redis.StrictRedis(
-            host=self.host,
-            port=self.port,
-            db=self.db,
+            host=host,
+            port=port,
+            db=db,
             password=self.password
         )
         

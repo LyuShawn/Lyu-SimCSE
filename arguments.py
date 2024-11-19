@@ -240,6 +240,14 @@ class ModelArguments:
         }
     )
 
+    knowledge_hard_negative: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use knowledge hard negative."
+        }
+    )
+
+
 @dataclass
 class DataTrainingArguments:
     """
