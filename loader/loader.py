@@ -48,10 +48,11 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             knowledge_hard_sent_list.append(knowledge_hard_sent)
         sentences += knowledge_hard_sent_list
         template = model_args.eval_template
-        eval_prefix = template.split("{sentence}")[0]
-        eval_suffix = template.split("{sentence}")[1]
-        eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids'][0:-1]
-        eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
+        if template:
+            eval_prefix = template.split("{sentence}")[0]
+            eval_suffix = template.split("{sentence}")[1]
+            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids']
+            eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids']
 
     # 如果有第三个句子
     if sent2_cname is not None:
@@ -88,8 +89,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
                 prompt_prefix = template.split("{sentence}")[0]
                 prompt_suffix = template.split("{sentence}")[1]
-                prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids'][0:-1]   # 去掉[SEP]
-                prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids'][1:] # 去掉[CLS]
+                prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
+                prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
 
             # 处理拼接input_ids
             if i < total:

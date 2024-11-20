@@ -29,15 +29,15 @@
                 "--overwrite_cache",
                 // "--do_prompt_enhancement",
                 "--sample_data","10000",
-                "--batch_inner_shuffle",
-                "--prompt_template", "The statement '{sentence}' could refer to {knowledge}, implying that [MASK].",
+                // "--batch_inner_shuffle",
+                // "--prompt_template", "The statement '{sentence}' could refer to {knowledge}, implying that [MASK].",
                 "--per_device_train_batch_size", "32",
                 "--eval_steps", "25",
                 "--knowledge_hard_negative",
                 // "--knowledge_fusion_type", "full",
-                "--eval_template", "This sentence : '{sentence}' means [MASK].",
+                // "--eval_template", "This sentence : '{sentence}' means [MASK].",
                 // "--knowledge_retrieve_type", "summary",
-                "--hard_negative_weight", "0.05"
+                "--hard_negative_weight", "0"
             ],
             "justMyCode": false
         },
