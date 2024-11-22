@@ -113,7 +113,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             elif i < total*2:
-                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_prefix_input_ids)
+                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             else:
                 if not s:
                     input_ids.append([])
@@ -127,7 +127,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             else:
                 # 不mask prompt，全关注
                 attention_mask.append([1] * len(input_ids[-1]))
-
+                # attention_mask.append([1] * (len(prompt_prefix_input_ids) + len(s['attention_mask']) + len(prompt_suffix_input_ids)))
         sent_features['input_ids'] = input_ids
         sent_features['attention_mask'] = attention_mask
 
