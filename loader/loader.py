@@ -47,12 +47,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                     knowledge_hard_sent = knowledge_sent_list[0][1]
             knowledge_hard_sent_list.append(knowledge_hard_sent)
         sentences += knowledge_hard_sent_list
-        template = model_args.eval_template
-        if template:
-            eval_prefix = template.split("{sentence}")[0]
-            eval_suffix = template.split("{sentence}")[1]
-            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids']
-            eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids']
 
     # 如果有第三个句子
     if sent2_cname is not None:
@@ -72,6 +66,13 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         else:
             prompt_prefix_input_ids2 = prompt_prefix_input_ids
             prompt_suffix_input_ids2 = prompt_suffix_input_ids
+
+        eval_template = model_args.eval_template
+        if eval_template:
+            eval_prefix = eval_template.split("{sentence}")[0]
+            eval_suffix = eval_template.split("{sentence}")[1]
+            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids']
+            eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids']
 
         input_ids = []
         attention_mask = []
@@ -96,7 +97,14 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             if i < total:
                 # 不处理对齐，直接拼接
                 s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
+                if model_args.knowledge_fusion_type == "positive":
+                    # 原句子做和prompt后的句子做正样例
+                    input_ids.append(s['input_ids'])
+                elif model_args.knowledge_fusion_type == "knowledge_positive":
+                    # eval_template中的句子和融入的知识做正样例
+                    input_ids.append(eval_prefix_input_ids + s['input_ids'] + eval_suffix_input_ids)
+                else:
+                    input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             elif i < total*2:
                 s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
                 input_ids.append(prompt_prefix_input_ids2 + s['input_ids'] + prompt_suffix_input_ids2)

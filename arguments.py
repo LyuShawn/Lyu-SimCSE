@@ -170,7 +170,7 @@ class ModelArguments:
         }
     )
 
-    knowledge_fusion_type: Literal["full","selective","fusion_loss"] = field(
+    knowledge_fusion_type: Literal["full","selective","fusion_loss","positive","knowledge_positive"] = field(
         default="full",
         metadata={
             "help": "The type of knowledge fusion."

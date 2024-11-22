@@ -406,7 +406,12 @@ def cl_forward(cls,
             z3 = z3[:,0,:]
         z1 = z1[:,0,:]
         z2 = z2[:,0,:]
-        
+
+    elif cls.model_args.knowledge_fusion_type=="positive":
+        orgin_pooler_output = cls.pooler(attention_mask, outputs)
+        orgin_pooler_output = orgin_pooler_output.view((batch_size, num_sent, orgin_pooler_output.size(-1))) # (bs, num_sent, hidden)
+        z1 = orgin_pooler_output[:,0]
+        z2 = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id]
     else:
         z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
