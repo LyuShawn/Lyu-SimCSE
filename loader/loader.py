@@ -112,7 +112,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             elif i < total*2:
-                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_prefix_input_ids)
+                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             else:
                 if not s:
                     input_ids.append([])
