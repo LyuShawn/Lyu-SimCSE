@@ -92,11 +92,16 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 prompt_suffix = template.split("{sentence}")[1]
                 prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
                 prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
+                
+                if model_args.cut_cls_token:
+                    prompt_prefix_input_ids = prompt_prefix_input_ids[0:-1]
+                    prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
+
+            s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
 
             # 处理拼接input_ids
             if i < total:
                 # 不处理对齐，直接拼接
-                s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
                 if model_args.knowledge_fusion_type == "positive":
                     # 原句子做和prompt后的句子做正样例
                     input_ids.append(s['input_ids'])
@@ -106,8 +111,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             elif i < total*2:
-                s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-                input_ids.append(prompt_prefix_input_ids2 + s['input_ids'] + prompt_suffix_input_ids2)
+                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             else:
                 if not s:
                     input_ids.append([])
@@ -120,7 +124,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
             else:
                 # 不mask prompt，全关注
-                attention_mask.append([1] * len(input_ids[-1])) # 用刚刚拼接的input_ids长度
+                assert len(input_ids[-1]) == len(s['attention_mask']) + len(prompt_prefix_input_ids) + len(prompt_suffix_input_ids)
+                attention_mask.append([1] * len(input_ids[-1]))
 
         sent_features['input_ids'] = input_ids
         sent_features['attention_mask'] = attention_mask

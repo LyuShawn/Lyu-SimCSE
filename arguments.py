@@ -171,7 +171,7 @@ class ModelArguments:
     )
 
     knowledge_fusion_type: Literal["full","selective","fusion_loss","positive","knowledge_positive"] = field(
-        default="full",
+        default="",
         metadata={
             "help": "The type of knowledge fusion."
         }
@@ -247,6 +247,13 @@ class ModelArguments:
         }
     )
 
+
+    cut_cls_token: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to cut cls."
+        }
+    )
 
 @dataclass
 class DataTrainingArguments:
