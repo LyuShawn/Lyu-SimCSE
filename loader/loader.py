@@ -73,8 +73,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         if eval_template:
             eval_prefix = eval_template.split("{sentence}")[0]
             eval_suffix = eval_template.split("{sentence}")[1]
-            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids']
-            eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids']
+            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids'][0:-1]
+            eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
 
         if knowledge_mark in model_args.prompt_template:
             knowledge_list = retrieval_knowledge_batch(examples[sent0_cname], retrieve_type=args.model_args.knowledge_retrieve_type)
@@ -94,10 +94,9 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 prompt_suffix = template.split("{sentence}")[1]
                 prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
                 prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
-                
-                if model_args.cut_cls_token:
-                    prompt_prefix_input_ids = prompt_prefix_input_ids[0:-1]
-                    prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
+
+                prompt_prefix_input_ids = prompt_prefix_input_ids[0:-1]
+                prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
 
             s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
 
@@ -113,7 +112,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
             elif i < total*2:
-                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
+                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_prefix_input_ids)
             else:
                 if not s:
                     input_ids.append([])
