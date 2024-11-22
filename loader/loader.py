@@ -100,6 +100,9 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
             s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
 
+            if model_args.cut_cls_token:
+                s['input_ids'] = s['input_ids'][1:-1]
+
             # 处理拼接input_ids
             if i < total:
                 # 不处理对齐，直接拼接

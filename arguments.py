@@ -247,6 +247,13 @@ class ModelArguments:
         }
     )
 
+    cut_cls_token: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to cut cls token."
+        }
+    )
+
 
 @dataclass
 class DataTrainingArguments:
