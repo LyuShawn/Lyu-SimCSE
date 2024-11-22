@@ -44,3 +44,26 @@ def retrieve_knowledge(sent, retrieve_type = 'title', max_length = -1):
         key = prifix + text_encode(sent)
         value = json.loads(redis_client.get(key))
         return value
+
+def retrieval_knowledge_batch(sent_list, retrieve_type = 'title', max_length = -1):
+    """
+        批量查询知识
+    """
+
+    if retrieve_type == 'title':
+        redis_client = RedisClient()
+        prifix = "wikisearch:"
+        keys = [prifix + text_encode(sent) for sent in sent_list]
+        values = redis_client.mget(keys)
+        result = []
+        for value in values:
+            if not value:
+                result.append(None)
+                continue
+            value = json.loads(value)
+            # 组装知识，把所有title拼接起来
+            knowledge = ""
+            for item in value:
+                knowledge += item["title"] + ","
+            result.append(knowledge[:-1])  # 去掉最后的逗号
+        return result

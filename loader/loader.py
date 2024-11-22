@@ -1,6 +1,6 @@
 from utils.sentence_util import text_encode
 import json
-from knowledge.retrieval import retrieve_knowledge
+from knowledge.retrieval import retrieve_knowledge,retrieval_knowledge_batch
 
 class PrepareFeaturesArgs:
     def __init__(self, tokenizer, data_args, model_args, sent0_cname, sent1_cname, sent2_cname):
@@ -48,6 +48,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             knowledge_hard_sent_list.append(knowledge_hard_sent)
         sentences += knowledge_hard_sent_list
 
+    knowledge_mark = "{knowledge}"
+
     # 如果有第三个句子
     if sent2_cname is not None:
         for idx in range(total):
@@ -74,15 +76,15 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids']
             eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids']
 
+        if knowledge_mark in model_args.prompt_template:
+            knowledge_list = retrieval_knowledge_batch(sentences, retrieve_type=args.model_args.knowledge_retrieve_type)
+
         input_ids = []
         attention_mask = []
         for i,s in enumerate(sentences):
 
-            knowledge_mark = "{knowledge}"
             if knowledge_mark in model_args.prompt_template:
-                knowledge = retrieve_knowledge(s, 
-                                            retrieve_type=args.model_args.knowledge_retrieve_type,
-                                            max_length = args.model_args.knowledge_max_length)
+                knowledge = knowledge_list[i]
                 if knowledge:
                     template = model_args.prompt_template.replace(knowledge_mark, knowledge)
                 else:
