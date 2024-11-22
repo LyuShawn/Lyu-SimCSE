@@ -26,7 +26,7 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                // "--overwrite_cache",
+                "--overwrite_cache",
                 "--do_prompt_enhancement",
                 "--sample_data","10000",
                 // "--batch_inner_shuffle",

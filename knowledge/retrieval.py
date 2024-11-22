@@ -8,6 +8,7 @@ def retrieve_knowledge(sent, retrieve_type = 'title', max_length = -1):
     """
     # 单例
     try:
+        raise Exception("redis_client")
         if retrieve_type == 'title':
             redis_client = RedisClient()
             prifix = "wikisearch:"
