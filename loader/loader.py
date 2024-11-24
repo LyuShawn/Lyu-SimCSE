@@ -90,12 +90,12 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     template = model_args.eval_template
 
-                prompt_prefix = template.split("{sentence}")[0]
-                prompt_suffix = template.split("{sentence}")[1]
+                prompt_prefix = template.split(knowledge_mark)[0]
+                prompt_suffix = template.split(knowledge_mark)[1]
                 prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
                 prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
 
-                prompt_prefix_input_ids = prompt_prefix_input_ids[0:-1]
+                prompt_prefix_input_ids = prompt_prefix_input_ids[:-1]
                 prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
 
             s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)

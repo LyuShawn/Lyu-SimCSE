@@ -410,7 +410,7 @@ def cl_forward(cls,
     elif cls.model_args.knowledge_fusion_type=="positive":
         orgin_pooler_output = cls.pooler(attention_mask, outputs)
         orgin_pooler_output = orgin_pooler_output.view((batch_size, num_sent, orgin_pooler_output.size(-1))) # (bs, num_sent, hidden)
-        z1 = orgin_pooler_output[:,0]
+        z1 = cls.mlp(orgin_pooler_output[:,0])
         z2 = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id]
     else:
         z1, z2 = pooler_output[:,0], pooler_output[:,1]
@@ -516,7 +516,6 @@ def sentemb_forward(
     )
 
     if cls.model_args.do_prompt_enhancement:
-        # 这里会出现bs*2个true，原因是在外面已经拼接了prefix和suffix，这里又拼接了一次
         pooler_output = outputs.last_hidden_state[input_ids == cls.model_args.mask_token_id]    # (bs, hidden)
         # pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)   # 出现多个mask 取平均 不会出现
     else:
