@@ -96,52 +96,6 @@ class ModelArguments:
         }
     )
 
-    do_prompt_enhancement: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use prompt enhancement."
-        }
-    )
-
-    do_prompt_denoising: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use prompt denoising."
-        }
-    )
-
-    prompt_denoising_weight: float = field(
-        default=1,
-        metadata={
-            "help": "Weight for prompt denoising auxiliary objective (only effective if --do_prompt_denoising)."
-        }
-    )
-
-    prompt_template: Optional[str] = field(
-        # 'The phrase \'{sentence}\' may relate to [KNOWLEDGE], thus [MASK] is implied.',
-        default='This sentence : \'{sentence}\' means [MASK].',
-        metadata={
-            "help": "The prompt template."
-        }
-    )
-
-    prompt_template2: Optional[str] = field(
-        # This sentence of \'{sentence}\' means [MASK].
-        default='',
-        metadata={
-            "help": "The prompt template."
-        }
-    )
-
-    eval_template: Optional[str] = field(
-        # This sentence : \'{sentence}\' means [MASK].
-        default='',
-        metadata={
-            "help": "如果指定了eval_template，那么在评估的时候，将使用这个模板。"
-        }
-    )
-
-
     dropout: float = field(
         default=0.1,
         metadata={
@@ -149,108 +103,10 @@ class ModelArguments:
         }
     )
 
-    page_title_num: int = field(
-        default=-1,
-        metadata={
-            "help": "The number of page titles."
-        }
-    )
-
-    mask_prompt: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use prompt bert mask."
-        }
-    )
-
-    do_knowledge_fusion: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use knowledge fusion."
-        }
-    )
-
-    knowledge_fusion_type: Literal["full","selective","fusion_loss","positive","knowledge_positive"] = field(
-        default="",
-        metadata={
-            "help": "The type of knowledge fusion."
-        }
-    )
-
-    knowledge_loss_weight: float = field(
-        default=0.1,
-        metadata={
-            "help": "The weight of knowledge loss."
-        }
-    )
-
-    knowledge_attention_strength: float = field(
-        default=1.0,
-        metadata={
-            "help": "The strength of knowledge attention."
-        }
-    )
-
-    knowledge_attention_head_num: int = field(
-        default=1,
-        metadata={
-            "help": "The number of knowledge attention heads."
-        }
-    )
-
-    freeze_attention_strength: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to freeze attention strength."
-        }
-    )
-
-    knowledge_attention_dropout: float = field(
-        default=0.0,
-        metadata={
-            "help": "The dropout of knowledge attention."
-        }
-    )
-
-    knowledge_encoder:bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use knowledge encoder."
-        }
-    )
-
-    knowledge_retrieve_type: Literal["title","summary"] = field(
-        default="title",
-        metadata={
-            "help": "The type of knowledge fusion."
-        }
-    )
-
-    knowledge_max_length: int = field(
-        default=256,
-        metadata={
-            "help": "The max length of knowledge."
-        }
-    )
-
     batch_inner_shuffle: bool = field(
         default=False,
         metadata={
             "help": "Whether to shuffle inner batch."
-        }
-    )
-
-    knowledge_hard_negative: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use knowledge hard negative."
-        }
-    )
-
-    cut_cls_token: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to cut cls token."
         }
     )
 
@@ -309,7 +165,7 @@ class DataTrainingArguments:
         metadata={"help": "The training data file (.txt or .csv)."}
     )
     max_seq_length: Optional[int] = field(
-        default=64,
+        default=32,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated."
