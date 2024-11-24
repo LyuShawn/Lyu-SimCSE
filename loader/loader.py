@@ -59,8 +59,9 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
     if model_args.do_prompt_enhancement:
         sent_features = {}
-        prompt_prefix_input_ids = model_args.prompt_prefix_input_ids
-        prompt_suffix_input_ids = model_args.prompt_suffix_input_ids
+
+        prompt_prefix_input_ids = tokenizer.encode(model_args.prompt_prefix)[:-1]
+        prompt_suffix_input_ids = tokenizer.encode(model_args.prompt_suffix)[1:]
 
         if model_args.prompt_template2:
             prompt_prefix_input_ids2 = model_args.prompt_prefix_input_ids2
@@ -73,7 +74,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         if eval_template:
             eval_prefix = eval_template.split("{sentence}")[0]
             eval_suffix = eval_template.split("{sentence}")[1]
-            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids'][0:-1]
+            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids'][:-1]
             eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
 
         if knowledge_mark in model_args.prompt_template:
@@ -98,10 +99,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 prompt_prefix_input_ids = prompt_prefix_input_ids[:-1]
                 prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
 
-            s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-
-            if model_args.cut_cls_token:
-                s['input_ids'] = s['input_ids'][1:-1]
+            s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
 
             # 处理拼接input_ids
             if i < total:
@@ -113,9 +111,9 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                     # eval_template中的句子和融入的知识做正样例
                     input_ids.append(eval_prefix_input_ids + s['input_ids'] + eval_suffix_input_ids)
                 else:
-                    input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
+                    input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
             elif i < total*2:
-                input_ids.append(prompt_prefix_input_ids + s['input_ids'] + prompt_suffix_input_ids)
+                input_ids.append(prompt_prefix_input_ids2 + s + prompt_suffix_input_ids2)
             else:
                 if not s:
                     input_ids.append([])
