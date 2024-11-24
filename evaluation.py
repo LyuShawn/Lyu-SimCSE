@@ -228,14 +228,20 @@ class EvaluationUtil:
 
             # Get raw embeddings
             with torch.no_grad():
-                try:
-                    outputs = model(**batch, output_hidden_states=True, return_dict=True, **args)
-                except:
-                    outputs = model(**batch, output_hidden_states=True, return_dict=True)
+                # try:
+                outputs = model(**batch, output_hidden_states=True, return_dict=True, **args)
+                # except Exception as e:
+                #     outputs = model(**batch, output_hidden_states=True, return_dict=True)
 
-                return pooler(
-                                attention_mask = batch['attention_mask'],
-                                outputs = outputs).cpu()
+            pooler_output=outputs.pooler_output
+            last_hidden_state=outputs.last_hidden_state,
+            hidden_states=outputs.hidden_states,
+
+            return pooler_output.cpu()
+
+            # return pooler(
+            #                 attention_mask = batch['attention_mask'],
+            #                 outputs = outputs).cpu()
 
         results = {}
 

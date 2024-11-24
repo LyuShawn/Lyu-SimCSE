@@ -99,7 +99,10 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 prompt_prefix_input_ids = prompt_prefix_input_ids[:-1]
                 prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
 
-            s = tokenizer.encode(s, add_special_tokens=False)[:data_args.max_seq_length]
+            s = tokenizer.encode(s, add_special_tokens=False,
+                                max_length=data_args.max_seq_length,
+                                truncation=True,
+                                padding="max_length" if data_args.pad_to_max_length else False,)
 
             # 处理拼接input_ids
             if i < total:
