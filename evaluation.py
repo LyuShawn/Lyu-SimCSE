@@ -56,6 +56,7 @@ class EvaluationUtil:
 
         self.mode = mode
 
+        self.pooler_type = model_args.pooler_type
         self.pooler = Pooler(model_args.pooler_type).to(self.device)
 
         self.local_model = os.path.exists(path)
@@ -91,12 +92,12 @@ class EvaluationUtil:
     def eval(self):
         """评估入口"""
         logging.info(
-            f"start evaluation {self.path},with pooler={self.pooler},task_set={self.task_set},mode={self.mode}"
+            f"start evaluation {self.path},with pooler={self.pooler_type},task_set={self.task_set},mode={self.mode}"
         )
 
         eval_result = {
             "eval_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "scores": {},
+            "eval_scores": {},
             "eval_details": [],
         }        
 
@@ -130,7 +131,7 @@ class EvaluationUtil:
 
         # scores 保存最好的结果
         best_result = max(eval_result["eval_details"], key=lambda x: x["avg"])
-        eval_result["scores"] = best_result["result"]
+        eval_result["eval_scores"] = best_result["result"]
         # 计算时间，记录秒
         eval_result["time_cost"] = float((datetime.now() - datetime.strptime(eval_result["eval_time"], "%Y-%m-%d %H:%M:%S")).seconds)
 
