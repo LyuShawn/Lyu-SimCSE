@@ -6,7 +6,7 @@ pandas
 scikit-learn
 prettytable
 gradio
-torch
+torch==2.5.1
 setuptools
 numpy==1.23.5
 accelerate>=0.26.0

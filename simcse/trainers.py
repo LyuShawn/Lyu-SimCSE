@@ -1,25 +1,7 @@
-import wandb
-import warnings
 from transformers import Trainer
-from transformers.utils import logging
-
-from transformers.utils import logging
-import torch
 from typing import Dict, List, Optional
 from torch.utils.data.dataset import Dataset
-from torch.amp import autocast
-
-
-PATH_TO_DATA = "./SentEval/data"
-
-import SentEval.senteval as senteval
-
-logger = logging.get_logger(__name__)
-
-import warnings
-
-warnings.filterwarnings("ignore", category=UserWarning)
-
+from evaluation import EvaluationUtil
 
 class CLTrainer(Trainer):
 
@@ -31,68 +13,33 @@ class CLTrainer(Trainer):
         eval_senteval_transfer: bool = False,
     ) -> Dict[str, float]:
 
-        # SentEval prepare and batcher
-        def prepare(params, samples):
-            return
+        params = EvaluationUtil.prepare_params(kfold=5, optim="rmsprop", batch_size=128, tenacity=3, epoch_size=2)
 
-        def batcher(params, batch):
-            sentences = [" ".join(s) for s in batch]
-            batch = self.tokenizer(
-                sentences,
-                return_tensors="pt",
-                padding=True,
-            ).to(self.args.device)
-
-            with torch.no_grad():
-                with autocast(device_type=self.args.device.type):
-                    outputs = self.model(
-                        **batch, output_hidden_states=True, return_dict=True, sent_emb=True
-                    )
-                    pooler_output = outputs.pooler_output
-            return pooler_output.cpu()
-
-        # Set params for SentEval (fastmode)
-        params = {"task_path": PATH_TO_DATA, "usepytorch": True, "kfold": 5}
-        params["classifier"] = {
-            "nhid": 0,
-            "optim": "rmsprop",
-            "batch_size": 128,
-            "tenacity": 3,
-            "epoch_size": 2,
-        }
-
-        se = senteval.engine.SE(params, batcher, prepare)
-        tasks = ["STSBenchmark", "SICKRelatedness"]
+        tasks = EvaluationUtil.dev_sts_task_list
         if eval_senteval_transfer or self.args.eval_transfer:
-            tasks = [
-                "STSBenchmark",
-                "SICKRelatedness",
-                "MR",
-                "CR",
-                "SUBJ",
-                "MPQA",
-                "SST2",
-                "TREC",
-                "MRPC",
-            ]
+            tasks += EvaluationUtil.dev_transfer_task_list
+
         self.model.eval()
-        results = se.eval(tasks)
+        results = EvaluationUtil.eval_core(
+            model = self.model,
+            tokenizer = self.tokenizer,
+            tasks = tasks,
+            params = params,
+            pooler=self.model.pooler,
+            args={
+                "sent_emb": True
+            }
+        )
 
-        stsb_spearman = results["STSBenchmark"]["dev"]["spearman"][0]
-        sickr_spearman = results["SICKRelatedness"]["dev"]["spearman"][0]
+        results = EvaluationUtil.process_result(results,tasks,mode="dev")
+        metrics = {}
+        for task in tasks:
+            metrics["eval_{}".format(task)] = results[task]
 
-        metrics = {
-            "eval_stsb_spearman": stsb_spearman,
-            "eval_sickr_spearman": sickr_spearman,
-            "eval_avg_sts": (stsb_spearman + sickr_spearman) / 2,
-        }
+        metrics["eval_avg_sts"] = (results["STSBenchmark"] + results["SICKRelatedness"]) / 2
+
         if eval_senteval_transfer or self.args.eval_transfer:
-            avg_transfer = 0
-            for task in ["MR", "CR", "SUBJ", "MPQA", "SST2", "TREC", "MRPC"]:
-                avg_transfer += results[task]["devacc"]
-                metrics["eval_{}".format(task)] = results[task]["devacc"]
-            avg_transfer /= 7
-            metrics["eval_avg_transfer"] = avg_transfer
+            metrics["eval_avg_transfer"] = sum([results[task] for task in EvaluationUtil.dev_transfer_task_list]) / len(EvaluationUtil.dev_transfer_task_list)
 
         self.log(metrics)
 

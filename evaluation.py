@@ -9,6 +9,7 @@ from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 import random
 from simcse.models import BertForCL
+from simcse.models import Pooler
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -16,26 +17,23 @@ PATH_TO_DATA = './SentEval/data'
 sys.path.insert(0, PATH_TO_SENTEVAL)
 import senteval
 
-eval_task_list =[
-    "STS12",
-    "STS13",
-    "STS14",
-    "STS15",
-    "STS16",
-    "STSBenchmark",
-    "SICKRelatedness",
-]
-
-def print_table(task_names, scores):
-    tb = PrettyTable()
-    tb.field_names = task_names
-    tb.add_row(scores)
-    logging.info(tb)
-
 class EvaluationUtil:
+
+    sts_task_list =[
+        "STS12",
+        "STS13",
+        "STS14",
+        "STS15",
+        "STS16",
+        "STSBenchmark",
+        "SICKRelatedness",
+    ]
+    transfer_task_list =["MR", "CR", "MPQA", "SUBJ", "SST2", "TREC", "MRPC"]
+    dev_sts_task_list = ["STSBenchmark", "SICKRelatedness"]
+    dev_transfer_task_list = transfer_task_list
+
     def __init__(self, path, model_args, task_set="sts", mode="test", *args ,**kwargs):
         """数据准备"""
-
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -43,9 +41,22 @@ class EvaluationUtil:
 
         self.model_args = model_args
         self.task_set = task_set
+
+        self.print_table_switch = False if not kwargs.get("print_table", None) else kwargs.get("print_table")
+
+        # Set up the tasks
+        if self.task_set == "sts":
+            self.tasks = self.sts_task_list
+        elif self.task_set == "transfer":
+            self.tasks = self.transfer_task_list
+        elif self.task_set == "full":
+            self.tasks = self.sts_task_list + self.transfer_task_list
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.mode = mode
-        self.pooler = model_args.pooler_type
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        self.pooler = Pooler(model_args.pooler_type).to(self.device)
 
         self.local_model = os.path.exists(path)
         self.base_path = path
@@ -58,7 +69,24 @@ class EvaluationUtil:
                     self.path.append(os.path.join(path, model_path))
             logging.info(f"load model from local, path:{path}")
         else:
-            logging.info(f"load model from huggingface, path:{path}")   
+            logging.info(f"load model from huggingface, path:{path}")
+
+        # 评估参数
+        if self.mode == "dev" or self.mode == "fasttest":
+            # Fast mode
+            self.params = self.prepare_params(kfold=5,optim="rmsprop",batch_size=128,tenacity=3,epoch_size=2)
+        elif self.mode == "test":
+            # Full mode
+            self.params = self.prepare_params(kfold=10,optim="adam",batch_size=256,tenacity=5,epoch_size=4)
+        else:
+            raise NotImplementedError
+
+    @classmethod
+    def print_table(cls, task_names, scores):
+        tb = PrettyTable()
+        tb.field_names = task_names
+        tb.add_row(scores)
+        logging.info(tb)
 
     def eval(self):
         """评估入口"""
@@ -68,7 +96,7 @@ class EvaluationUtil:
 
         eval_result = {
             "eval_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "avg_scores": {},
+            "scores": {},
             "eval_details": [],
         }        
 
@@ -77,7 +105,7 @@ class EvaluationUtil:
             if self.local_model:
                 model = BertForCL.from_pretrained(path, model_args=self.model_args)
             else:
-                model = AutoModel.from_pretrained(path).to(self.device)
+                model = AutoModel.from_pretrained(path)
 
             tokenizer = AutoTokenizer.from_pretrained(path)
             model.to(self.device)
@@ -88,84 +116,89 @@ class EvaluationUtil:
             result = self.eval_core(
                 model=model,
                 tokenizer=tokenizer,
+                tasks=self.tasks,
+                params=self.params,
+                pooler=self.pooler,
                 args=args
             )
-            # 处理结果
-            result = self.process_result(result)
+            result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
             eval_result["eval_details"].append({
                 "path": path,
                 "result": result,
                 "avg": result["avg"],
             })
 
-        # avg_scores 保存最好的结果
+        # scores 保存最好的结果
         best_result = max(eval_result["eval_details"], key=lambda x: x["avg"])
-        eval_result["avg_scores"] = best_result["result"]
+        eval_result["scores"] = best_result["result"]
+        # 计算时间，记录秒
+        eval_result["time_cost"] = float((datetime.now() - datetime.strptime(eval_result["eval_time"], "%Y-%m-%d %H:%M:%S")).seconds)
 
         if self.local_model:
-            score_file_path = os.path.join(self.base_path, "avg_scores.json")
+            score_file_path = os.path.join(self.base_path, "eval_scores.json")
             with open(score_file_path, "w") as f:
                 json.dump(eval_result, f, indent=4, sort_keys=True)
             return eval_result, score_file_path
         else:
             return eval_result
 
-    def process_result(self, result):
+    @classmethod
+    def process_result(cls, results, tasks, mode="test",print_table_switch=False):
         """处理senteval的结果"""
-        task_scores = {}
 
-        for task in eval_task_list:
-            if task in result:
-                if task in ["STS12", "STS13", "STS14", "STS15", "STS16"]:
-                    task_scores[task] = result[task]["all"]["spearman"]["all"]
+        scores = {}
+        if mode == "dev":
+            # dev模式
+            for task in tasks:
+                score = 0.00
+                if task in ["STSBenchmark", "SICKRelatedness"]:
+                    score = results[task]["dev"]["spearman"][0]
+                elif task in cls.transfer_task_list:
+                    score = results[task]["devacc"]
                 else:
-                    task_scores[task] = result[task]["test"]["spearman"].correlation
+                    raise NotImplementedError
+                scores[task] = score
+        elif mode == "test" or mode == "fasttest":
+            # test模式
+            for task in tasks:
+                score = 0.00
+                if task in ["STS12", "STS13", "STS14", "STS15", "STS16"]:
+                    score = results[task]["all"]["spearman"]["all"]
+                elif task in ["STSBenchmark", "SICKRelatedness"]:
+                    score = results[task]["test"]["spearman"][0]
+                elif task in cls.transfer_task_list:
+                    score = results[task]["acc"]
+                else:
+                    raise NotImplementedError
+                scores[task] = score
 
-        task_scores["avg"] = sum(task_scores.values()) / len(task_scores)
-        return task_scores
+        scores["avg"] = sum(scores.values()) / len(scores)
 
+        scores["sts_avg"] = sum([scores[task] for task in tasks if task in cls.sts_task_list]) / len(cls.sts_task_list)
+        scores["transfer_avg"] = sum([scores[task] for task in tasks if task in cls.transfer_task_list]) / len(cls.transfer_task_list)
+
+        if print_table_switch:
+            task_names = list(scores.keys())
+            table_scores = ["%.4f" % (score * 100) for score in scores.values()]
+            cls.print_table(task_names, table_scores)
+
+        return scores
+
+    @classmethod
     def eval_core(
-        self,
+        cls,
         model,
         tokenizer,
+        tasks,
+        params,
+        pooler,
+        device=None,
         args=None,
     ):
         """评估核心"""
 
-        pooler = self.pooler
-
-        # Set up the tasks
-        if self.task_set == "sts":
-            tasks = eval_task_list
-        elif self.task_set == "transfer":
-            tasks = ["MR", "CR", "MPQA", "SUBJ", "SST2", "TREC", "MRPC"]
-        elif self.task_set == "full":
-            tasks = eval_task_list
-            tasks += ["MR", "CR", "MPQA", "SUBJ", "SST2", "TREC", "MRPC"]
-
-        # Set params for SentEval
-        if self.mode == "dev" or self.mode == "fasttest":
-            # Fast mode
-            params = {"task_path": PATH_TO_DATA, "usepytorch": True, "kfold": 5}
-            params["classifier"] = {
-                "nhid": 0,
-                "optim": "rmsprop",
-                "batch_size": 128,
-                "tenacity": 3,
-                "epoch_size": 2,
-            }
-        elif self.mode == "test":
-            # Full mode
-            params = {"task_path": PATH_TO_DATA, "usepytorch": True, "kfold": 10}
-            params["classifier"] = {
-                "nhid": 0,
-                "optim": "adam",
-                "batch_size": 64,
-                "tenacity": 5,
-                "epoch_size": 4,
-            }
-        else:
-            raise NotImplementedError
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # SentEval prepare and batcher
         def prepare(params, samples):
@@ -178,83 +211,30 @@ class EvaluationUtil:
 
             sentences = [" ".join(s) for s in batch]
 
-            # if self.model_args.do_prompt_enhancement and self.model_args.prompt_template:
-            #     # 做提示增强，准备prompt
-            #     template = self.model_args.eval_template if self.model_args.eval_template else self.model_args.prompt_template
-            #     template = template.replace("[MASK]", tokenizer.mask_token)
-
-            #     for i, s in enumerate(sentences):
-            #         if len(s) > 0 and s[-1] not in '.?"\'': s += '.'
-            #         sentences[i] = template.replace("{sentence}", s).strip()
-
             # Tokenization
-            if max_length is not None:
-                batch = tokenizer.batch_encode_plus(
-                    sentences,
-                    return_tensors="pt",
-                    padding=True,
-                    max_length=max_length,
-                    truncation=True,
-                )
-            else:
-                batch = tokenizer.batch_encode_plus(
-                    sentences,
-                    return_tensors="pt",
-                    padding=True,
-                )
+
+            batch = tokenizer(
+                sentences,
+                return_tensors="pt",
+                padding=True,
+                max_length=max_length,
+                truncation=max_length if max_length is not None else False,
+            )
 
             # Move to the correct device
             for k in batch:
-                batch[k] = batch[k].to(self.device)
+                batch[k] = batch[k].to(device)
 
             # Get raw embeddings
             with torch.no_grad():
-
-                if self.local_model:
+                try:
                     outputs = model(**batch, output_hidden_states=True, return_dict=True, **args)
-                else:
+                except:
                     outputs = model(**batch, output_hidden_states=True, return_dict=True)
 
-                last_hidden = outputs.last_hidden_state
-                hidden_states = outputs.hidden_states
-                pooler_output = outputs.pooler_output
-
-            # Apply different poolers
-            if self.model_args.do_prompt_enhancement:
-                # pooler_output = last_hidden[batch['input_ids'] == tokenizer.mask_token_id]
-                # 如果有应用模板去燥再加
-                # return pooler_output.view(batch['input_ids'].shape[0], -1).cpu()
-                return pooler_output.cpu()
-            elif pooler == "cls":
-                # There is a linear+activation layer after CLS representation
-                return pooler_output.cpu()
-            elif pooler == "cls_before_pooler":
-                return last_hidden[:, 0].cpu()
-            elif pooler == "avg":
-                return (
-                    (last_hidden * batch["attention_mask"].unsqueeze(-1)).sum(1)
-                    / batch["attention_mask"].sum(-1).unsqueeze(-1)
-                ).cpu()
-            elif pooler == "avg_first_last":
-                first_hidden = hidden_states[1]
-                last_hidden = hidden_states[-1]
-                pooled_result = (
-                    (first_hidden + last_hidden)
-                    / 2.0
-                    * batch["attention_mask"].unsqueeze(-1)
-                ).sum(1) / batch["attention_mask"].sum(-1).unsqueeze(-1)
-                return pooled_result.cpu()
-            elif pooler == "avg_top2":
-                second_last_hidden = hidden_states[-2]
-                last_hidden = hidden_states[-1]
-                pooled_result = (
-                    (last_hidden + second_last_hidden)
-                    / 2.0
-                    * batch["attention_mask"].unsqueeze(-1)
-                ).sum(1) / batch["attention_mask"].sum(-1).unsqueeze(-1)
-                return pooled_result.cpu()
-            else:
-                raise NotImplementedError
+                return pooler(
+                                attention_mask = batch['attention_mask'],
+                                outputs = outputs).cpu()
 
         results = {}
 
@@ -263,67 +243,19 @@ class EvaluationUtil:
             result = se.eval(task)
             results[task] = result
 
-        # Print evaluation results
-        if self.mode == "dev":
-            logging.info("------ %s ------" % (self.mode))
-
-            task_names = []
-            scores = []
-            for task in ["STSBenchmark", "SICKRelatedness"]:
-                task_names.append(task)
-                if task in results:
-                    scores.append("%.2f" % (results[task]["dev"]["spearman"][0] * 100))
-                else:
-                    scores.append("0.00")
-            print_table(task_names, scores)
-
-            task_names = []
-            scores = []
-            for task in ["MR", "CR", "SUBJ", "MPQA", "SST2", "TREC", "MRPC"]:
-                task_names.append(task)
-                if task in results:
-                    scores.append("%.2f" % (results[task]["devacc"]))
-                else:
-                    scores.append("0.00")
-            task_names.append("Avg.")
-            scores.append("%.2f" % (sum([float(score) for score in scores]) / len(scores)))
-            print_table(task_names, scores)
-
-        elif self.mode == "test" or self.mode == "fasttest":
-            logging.info("------ %s ------" % (self.mode))
-
-            task_names = []
-            scores = []
-            for task in eval_task_list:
-                task_names.append(task)
-                if task in results:
-                    if task in ["STS12", "STS13", "STS14", "STS15", "STS16"]:
-                        scores.append(
-                            "%.2f" % (results[task]["all"]["spearman"]["all"] * 100)
-                        )
-                    else:
-                        scores.append(
-                            "%.2f" % (results[task]["test"]["spearman"].correlation * 100)
-                        )
-                else:
-                    scores.append("0.00")
-            task_names.append("Avg.")
-            scores.append("%.2f" % (sum([float(score) for score in scores]) / len(scores)))
-            print_table(task_names, scores)
-
-            task_names = []
-            scores = []
-            for task in ["MR", "CR", "SUBJ", "MPQA", "SST2", "TREC", "MRPC"]:
-                task_names.append(task)
-                if task in results:
-                    scores.append("%.2f" % (results[task]["acc"]))
-                else:
-                    scores.append("0.00")
-            task_names.append("Avg.")
-            scores.append("%.2f" % (sum([float(score) for score in scores]) / len(scores)))
-            print_table(task_names, scores)
         return results
 
+    @classmethod
+    def prepare_params(cls, kfold,optim,batch_size,tenacity,epoch_size):
+        params = {"task_path": PATH_TO_DATA, "usepytorch": True, "kfold": kfold}
+        params["classifier"] = {
+            "nhid": 0,
+            "optim": optim,
+            "batch_size": batch_size,
+            "tenacity": tenacity,
+            "epoch_size": epoch_size,
+        }
+        return params
 
 def main():
     # 解析命令行参数

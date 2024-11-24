@@ -374,7 +374,7 @@ class OurTrainingArguments(TrainingArguments):
     
     # 评率的最好策略方式
     metric_for_best_model: Optional[str] = field(
-        default="stsb_spearman", 
+        default="eval_STSBenchmark", 
         metadata={"help": "The metric to use to compare two different models."}
     )
     
@@ -477,4 +477,9 @@ class EvalArguments:
     times: int = field(
         default=3,
         metadata={"help": "The number of times to evaluate the model."},
+    )
+
+    print_table: bool = field(
+        default=False,
+        metadata={"help": "Print table."},
     )
