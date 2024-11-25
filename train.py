@@ -208,6 +208,7 @@ def main():
             model.eval_suffix_origin_input_ids = tokenizer.encode(eval_suffix, add_special_tokens=False)
 
         else:
+            model_args.eval_template = model_args.prompt_template
             model.eval_prefix_input_ids = model.prompt_prefix_input_ids
             model.eval_suffix_input_ids = model.prompt_suffix_input_ids
             model.eval_prefix_origin_input_ids = model.prompt_prefix_origin_input_ids

@@ -471,7 +471,7 @@ class EvalArguments:
     task_set: str = field(
         default="sts",
         metadata={"help": "The task set.",
-                "choices": ["sts", "transfer, full","na"]},
+                "choices": ["sts", "transfer", "full","na"]},
     )
 
     times: int = field(

@@ -50,7 +50,7 @@
             "console": "integratedTerminal",
             "args": [
                 //"--path", "model/unsup-PromptBERT-baseline/", "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
-                "--path", "model/unsup-simcse-bert-base-uncased/"
+                "--path", "model/unsup-simcse-bert-base-uncased/", "--task_set","transfer"
             ],
             "justMyCode": false
         }
