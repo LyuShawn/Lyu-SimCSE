@@ -27,16 +27,16 @@
                 "--do_train", 
                 "--do_eval",
                 // "--overwrite_cache",
-                "--do_prompt_enhancement",
+                // "--do_prompt_enhancement",
                 "--sample_data","10000",
                 // "--batch_inner_shuffle",
                 // "--prompt_template", "This sentence of '{sentence}' means [MASK].",
-                "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",
+                // "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",
                 "--per_device_train_batch_size", "32",
                 "--eval_steps", "25",
                 // "--knowledge_hard_negative",
-                "--knowledge_fusion_type", "knowledge_positive",
-                "--eval_template", "This sentence of '{sentence}' means [MASK].",
+                // "--knowledge_fusion_type", "knowledge_positive",
+                // "--eval_template", "This sentence of '{sentence}' means [MASK].",
                 // "--knowledge_retrieve_type", "summary",
                 // "--hard_negative_weight", "0"
             ],
@@ -49,7 +49,8 @@
             "program": "${workspaceFolder}/evaluation.py",
             "console": "integratedTerminal",
             "args": [
-                "--path", "model/unsup-simcse-bert-base-uncased/", "--print_table"
+                //"--path", "model/unsup-PromptBERT-baseline/", "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
+                "--path", "model/unsup-simcse-bert-base-uncased/"
             ],
             "justMyCode": false
         }

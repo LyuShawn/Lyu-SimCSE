@@ -219,12 +219,12 @@ class Pooler(nn.Module):
 
         assert self.pooler_type in self.pooler_type_list, "unrecognized pooling type %s" % self.pooler_type
 
-    def forward(self, attention_mask, outputs, input_ids=None, mask_token_id=None, pooler_type=None):
+    def forward(self, attention_mask, outputs, input_ids=None, mask_token_id=None, pooler_type=None,use_pooler_output=False):
         last_hidden = outputs.last_hidden_state # (bs, len, hidden)
         pooler_output = outputs.pooler_output
-        hidden_states = outputs.hidden_states   
+        hidden_states = outputs.hidden_states
 
-        if pooler_output is not None:
+        if use_pooler_output:
             return pooler_output
 
         pooler_type = pooler_type if pooler_type is not None else self.pooler_type

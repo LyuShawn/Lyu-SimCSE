@@ -181,15 +181,14 @@ def main():
         raise NotImplementedError
 
 
+    model.mask_token_id = tokenizer.mask_token_id
+    model.pad_token_id = tokenizer.pad_token_id
     if model_args.do_prompt_enhancement:
 
         template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
 
         model_args.prompt_prefix = template.split('{sentence}')[0]    
         model_args.prompt_suffix = template.split('{sentence}')[1]
-
-        model.mask_token_id = tokenizer.mask_token_id
-        model.pad_token_id = tokenizer.pad_token_id
 
         model.prompt_prefix_input_ids = tokenizer.encode(model_args.prompt_prefix)[:-1]
         model.prompt_suffix_input_ids = tokenizer.encode(model_args.prompt_suffix)[1:]

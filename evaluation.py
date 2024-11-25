@@ -8,7 +8,6 @@ import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 from simcse.models import Pooler
-from transformers import AutoModel, AutoTokenizer
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -111,6 +110,7 @@ class EvaluationUtil:
                 tasks=self.tasks,
                 params=self.params,
                 pooler=self.pooler,
+                model_args=self.model_args,
             )
             result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
             eval_result["eval_details"].append({
@@ -184,7 +184,8 @@ class EvaluationUtil:
         params,
         pooler,
         device=None,
-        args=None,
+        model_args=None,
+        use_pooler_output=False,
     ):
         """评估核心"""
 
@@ -204,6 +205,10 @@ class EvaluationUtil:
 
             sentences = [" ".join(s) for s in batch]
 
+            if model_args.do_prompt_enhancement and model_args.eval_template:
+                template = model_args.eval_template
+                sentences = [template.replace("{sentence}", s).replace("[MASK]", tokenizer.mask_token) for s in sentences]
+
             # Tokenization
 
             batch = tokenizer(
@@ -220,12 +225,13 @@ class EvaluationUtil:
 
             # Get raw embeddings
             with torch.no_grad():
-                outputs = model(**batch, output_hidden_states=True, return_dict=True, **args if args else {})
+                outputs = model(**batch, output_hidden_states=True, return_dict=True)
 
             return pooler(attention_mask = batch['attention_mask'],
                         outputs = outputs,
                         input_ids = batch['input_ids'],
-                        mask_token_id = tokenizer.mask_token_id).cpu()
+                        mask_token_id = tokenizer.mask_token_id,
+                        use_pooler_output = use_pooler_output).cpu()
 
         results = {}
 
@@ -234,6 +240,42 @@ class EvaluationUtil:
             result = se.eval(task)
             results[task] = result
 
+        return results
+
+    @classmethod
+    def dev_eval(cls,model,tokenizer,tasks,params):
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        def prepare(params, samples):
+            return
+        
+        def batcher(params, batch, max_length=None):
+            # Handle rare token encoding issues in the dataset
+            if len(batch) >= 1 and len(batch[0]) >= 1 and isinstance(batch[0][0], bytes):
+                batch = [[word.decode(# The above code is a Python script that outputs three hash
+                # symbols "
+                "utf-8") for word in s] for s in batch]
+
+            sentences = [" ".join(s) for s in batch]
+            batch = tokenizer(
+                sentences,
+                return_tensors="pt",
+                padding=True,
+                max_length=max_length,
+                truncation=max_length if max_length is not None else False,
+            )
+            for k in batch:
+                batch[k] = batch[k].to(device)
+            with torch.no_grad():
+                outputs = model(**batch, output_hidden_states=True, return_dict=True, sent_emb=True)
+            return outputs.pooler_output.cpu()
+            
+        results = {}
+        for task in tasks:
+            se = senteval.engine.SE(params, batcher, prepare)
+            result = se.eval(task)
+            results[task] = result
         return results
 
     @classmethod

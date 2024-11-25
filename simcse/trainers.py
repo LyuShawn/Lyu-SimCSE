@@ -20,15 +20,11 @@ class CLTrainer(Trainer):
             tasks += EvaluationUtil.dev_transfer_task_list
 
         self.model.eval()
-        results = EvaluationUtil.eval_core(
+        results = EvaluationUtil.dev_eval(
             model = self.model,
             tokenizer = self.tokenizer,
             tasks = tasks,
             params = params,
-            pooler=self.model.pooler,
-            args={
-                "sent_emb": True
-            }
         )
 
         results = EvaluationUtil.process_result(results,tasks,mode="dev")
