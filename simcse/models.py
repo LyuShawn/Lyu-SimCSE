@@ -203,26 +203,58 @@ class Pooler(nn.Module):
     'avg_top2': average of the last two layers.
     'avg_first_last': average of the first and the last layers.
     """
-    def __init__(self, pooler_type):
+
+    pooler_type_list = ["cls", "cls_before_pooler", "avg", "avg_top2", "avg_first_last","mask","half_mask"]
+
+    def __init__(self, pooler_type, **kwargs):
         super().__init__()
-        self.pooler_type = pooler_type
-        assert self.pooler_type in ["cls", "cls_before_pooler", "avg", "avg_top2", "avg_first_last"], "unrecognized pooling type %s" % self.pooler_type
 
-    def forward(self, attention_mask, outputs):
-        last_hidden = outputs.last_hidden_state
+        if kwargs.get("do_prompt_enhancement"):
+            if kwargs.get("knowledge_fusion_type") == "positive":
+                self.pooler_type = "half_mask"
+            else:
+                self.pooler_type = "mask"
+        else:
+            self.pooler_type = pooler_type
+
+        assert self.pooler_type in self.pooler_type_list, "unrecognized pooling type %s" % self.pooler_type
+
+    def forward(self, attention_mask, outputs, input_ids=None, mask_token_id=None, pooler_type=None):
+        last_hidden = outputs.last_hidden_state # (bs, len, hidden)
         pooler_output = outputs.pooler_output
-        hidden_states = outputs.hidden_states
+        hidden_states = outputs.hidden_states   
 
-        if self.pooler_type in ['cls_before_pooler', 'cls']:
+        if pooler_output is not None:
+            return pooler_output
+
+        pooler_type = pooler_type if pooler_type is not None else self.pooler_type
+        assert pooler_type in self.pooler_type_list, "unrecognized pooling type %s" % pooler_type
+
+        if pooler_type == "mask":
+
+            assert input_ids is not None and mask_token_id is not None, "input_ids and mask_token_id should be provided for mask pooling"
+            return last_hidden[input_ids == mask_token_id]
+
+        if pooler_type == "half_mask":
+            # last_hidden 前一半用cls，后一半用mask
+            assert input_ids is not None and mask_token_id is not None, "input_ids and mask_token_id should be provided for mask pooling"
+            bs = last_hidden.size(0) // 2
+            # 全取，根据mask只会有一半有值
+            cls_output = last_hidden[:bs, 0]    # (bs, hidden)
+            mask_output = last_hidden[input_ids == mask_token_id]   # (bs, hidden)
+            assert cls_output.size(0) == mask_output.size(0)
+            return torch.cat([cls_output, mask_output], dim=0)
+
+        if pooler_type in ['cls_before_pooler', 'cls']:
             return last_hidden[:, 0]
-        elif self.pooler_type == "avg":
+        elif pooler_type == "avg":
             return ((last_hidden * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1))
-        elif self.pooler_type == "avg_first_last":
+        elif pooler_type == "avg_first_last":
             first_hidden = hidden_states[1]
             last_hidden = hidden_states[-1]
             pooled_result = ((first_hidden + last_hidden) / 2.0 * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
             return pooled_result
-        elif self.pooler_type == "avg_top2":
+        elif pooler_type == "avg_top2":
             second_last_hidden = hidden_states[-2]
             last_hidden = hidden_states[-1]
             pooled_result = ((last_hidden + second_last_hidden) / 2.0 * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
@@ -236,7 +268,7 @@ def cl_init(cls, config):
     Contrastive learning class init function.
     """
     cls.pooler_type = cls.model_args.pooler_type
-    cls.pooler = Pooler(cls.model_args.pooler_type)
+    cls.pooler = Pooler(**cls.model_args.__dict__)
     if cls.model_args.pooler_type == "cls":
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
@@ -311,46 +343,52 @@ def cl_forward(cls,
 
     # Pooling
 
-    if cls.model_args.do_prompt_enhancement:
-        if cls.model_args.do_knowledge_fusion:
-            # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
-            if cls.knowledge_encoder is not None:
-                knowledge_output = cls.knowledge_encoder(
-                    **sent_knowledge,
-                    return_dict=True,
-                )
-            else:
-                knowledge_output = encoder(
-                    **sent_knowledge,
-                    return_dict=True,
-                )
-            # 对knowledge_output进行pooling
-            knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
+    # if cls.model_args.do_prompt_enhancement:
+    #     if cls.model_args.do_knowledge_fusion:
+    #         # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
+    #         if cls.knowledge_encoder is not None:
+    #             knowledge_output = cls.knowledge_encoder(
+    #                 **sent_knowledge,
+    #                 return_dict=True,
+    #             )
+    #         else:
+    #             knowledge_output = encoder(
+    #                 **sent_knowledge,
+    #                 return_dict=True,
+    #             )
+    #         # 对knowledge_output进行pooling
+    #         knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
 
-            # 计算empty_knowledge_mask
-            non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
-            empty_knowledge_mask = non_zero_count <= 2
+    #         # 计算empty_knowledge_mask
+    #         non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
+    #         empty_knowledge_mask = non_zero_count <= 2
 
-            last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
-            # 取一半
-            last_hidden_state = last_hidden_state[:,1,:]    # (bs, len, hidden)
+    #         last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
+    #         # 取一半
+    #         last_hidden_state = last_hidden_state[:,1,:]    # (bs, len, hidden)
 
-            # 原ori_input_ids取一半
-            sent_input_ids = ori_input_ids[:,0,:]    # (bs, len)
-            # 进行知识融合  (bs, hidden)
-            mask_attn_output = cls.knowledge_fusion(
-                model_output=last_hidden_state,
-                input_ids=sent_input_ids,    # (bs , len)
-                knowledge_output = knowledge_output, # (bs, hidden)
-                empyt_knowledge_mask = empty_knowledge_mask, # (bs)
-                # knowledge_token_id = cls.model_args.knowledge_token_id,
-                mask_token_id = cls.mask_token_id)
+    #         # 原ori_input_ids取一半
+    #         sent_input_ids = ori_input_ids[:,0,:]    # (bs, len)
+    #         # 进行知识融合  (bs, hidden)
+    #         mask_attn_output = cls.knowledge_fusion(
+    #             model_output=last_hidden_state,
+    #             input_ids=sent_input_ids,    # (bs , len)
+    #             knowledge_output = knowledge_output, # (bs, hidden)
+    #             empyt_knowledge_mask = empty_knowledge_mask, # (bs)
+    #             # knowledge_token_id = cls.model_args.knowledge_token_id,
+    #             mask_token_id = cls.mask_token_id)
 
-        pooler_output = outputs.last_hidden_state[input_ids == cls.mask_token_id]
+    #     # if cls.model_args.pooler_type == "cls":
+
+    #     pooler_output = outputs.last_hidden_state[input_ids == cls.mask_token_id]
     
-        pooler_output = pooler_output.view(batch_size * num_sent, -1) # (bs * num_sent, hidden)
-    else:
-        pooler_output = cls.pooler(attention_mask, outputs)
+    #     pooler_output = pooler_output.view(batch_size * num_sent, -1) # (bs * num_sent, hidden)
+    # else:
+        
+    pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id)
+
+    assert pooler_output.size(0) == batch_size * num_sent and pooler_output.size(1) == outputs.last_hidden_state.size(-1)
+
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
     pooler_output = cls.mlp(pooler_output)
@@ -405,13 +443,7 @@ def cl_forward(cls,
         z1 = z1[:,0,:]
         z2 = z2[:,0,:]
 
-    elif cls.model_args.knowledge_fusion_type=="positive":
-        orgin_pooler_output = cls.pooler(attention_mask, outputs)
-        orgin_pooler_output = orgin_pooler_output.view((batch_size, num_sent, orgin_pooler_output.size(-1))) # (bs, num_sent, hidden)
-        z1 = cls.mlp(orgin_pooler_output[:,0])
-        z2 = outputs.last_hidden_state[input_ids == cls.mask_token_id]
-    else:
-        z1, z2 = pooler_output[:,0], pooler_output[:,1]
+    z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
     # Hard negative
     if num_sent == 3:
@@ -475,14 +507,15 @@ def sentemb_forward(
     return_dict=None,
 ):
 
+    pooler_type = cls.pooler_type
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
     if cls.model_args.do_prompt_enhancement:
 
         new_input_ids = []
 
-        prompt_prefix = torch.LongTensor(cls.prompt_prefix_origin_input_ids).to(input_ids.device)
-        prompt_suffix = torch.LongTensor(cls.prompt_suffix_origin_input_ids).to(input_ids.device)
+        prompt_prefix = torch.LongTensor(cls.eval_prefix_origin_input_ids).to(input_ids.device)
+        prompt_suffix = torch.LongTensor(cls.eval_suffix_origin_input_ids).to(input_ids.device)
 
         # input_ids: (bs, len)
         for sent in input_ids:
@@ -502,27 +535,10 @@ def sentemb_forward(
 
             new_input_ids.append(new_input)
 
-        # # 只做表征的时候，不会用到外部知识，所以不需要使用外部知识的prompt
-        # prompt_prefix_input_ids = torch.tensor(cls.model_args.eval_prefix_input_ids).to(input_ids.device)
-        # prompt_suffix_input_ids = torch.tensor(cls.model_args.eval_suffix_input_ids).to(input_ids.device)
-        # # 拼接prompt和input_ids，去除input_ids末尾的pad
-        # non_pad_lengths = (input_ids != cls.model_args.pad_token_id).sum(dim=1)  # 每个句子的非 PAD token 长度
-        # # 移除末尾的 pad
-        # trimmed_input_ids = [input[:length] for input, length in zip(input_ids, non_pad_lengths)]
-        # # 拼接 prefix、trimmed input 和 suffix
-        # concatenated_input_ids = [
-        #     torch.cat([prompt_prefix_input_ids, trimmed_input, prompt_suffix_input_ids], dim=0)
-        #     for trimmed_input in trimmed_input_ids
-        # ]
-        # ml = max(input.size(0) for input in concatenated_input_ids)
-        # input_ids = torch.stack([
-        #     torch.cat([input, torch.full((ml - input.size(0),), cls.model_args.pad_token_id, device=input_ids.device)])
-        #     for input in concatenated_input_ids
-        # ])
-
         input_ids = torch.stack(new_input_ids, dim=0)
         attention_mask = (input_ids != cls.pad_token_id).long()
         token_type_ids = None
+        pooler_type = "mask"
 
     outputs = encoder(
         input_ids,
@@ -536,14 +552,10 @@ def sentemb_forward(
         return_dict=True,
     )
 
-    if cls.model_args.do_prompt_enhancement:
-        pooler_output = outputs.last_hidden_state[input_ids == cls.mask_token_id]    # (bs, hidden)
-        # pooler_output = pooler_output.view(input_ids.shape[0], -1, pooler_output.shape[-1]).mean(1)   # 出现多个mask 取平均 不会出现
-
-    else:
-        pooler_output = cls.pooler(attention_mask, outputs)
-        if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
-            pooler_output = cls.mlp(pooler_output)
+    pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id, pooler_type=pooler_type)
+    
+    if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
+        pooler_output = cls.mlp(pooler_output)
 
     if not return_dict:
         return (outputs[0], pooler_output) + outputs[2:]

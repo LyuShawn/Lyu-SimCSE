@@ -7,9 +7,8 @@ from transformers import AutoModel, AutoTokenizer,HfArgumentParser
 import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
-import random
-from simcse.models import BertForCL
 from simcse.models import Pooler
+from transformers import AutoModel, AutoTokenizer
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -103,16 +102,8 @@ class EvaluationUtil:
 
         for path in self.path:
 
-            if self.local_model:
-                model = BertForCL.from_pretrained(path, model_args=self.model_args)
-            else:
-                model = AutoModel.from_pretrained(path)
-
+            model = AutoModel.from_pretrained(path).to(self.device)
             tokenizer = AutoTokenizer.from_pretrained(path)
-            model.to(self.device)
-
-            # 只做文本表征时用
-            args = {"sent_emb": True}            
 
             result = self.eval_core(
                 model=model,
@@ -120,7 +111,6 @@ class EvaluationUtil:
                 tasks=self.tasks,
                 params=self.params,
                 pooler=self.pooler,
-                args=args
             )
             result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
             eval_result["eval_details"].append({
@@ -208,7 +198,9 @@ class EvaluationUtil:
         def batcher(params, batch, max_length=None):
             # Handle rare token encoding issues in the dataset
             if len(batch) >= 1 and len(batch[0]) >= 1 and isinstance(batch[0][0], bytes):
-                batch = [[word.decode("utf-8") for word in s] for s in batch]
+                batch = [[word.decode(# The above code is a Python script that outputs three hash
+                # symbols "
+                "utf-8") for word in s] for s in batch]
 
             sentences = [" ".join(s) for s in batch]
 
@@ -228,20 +220,12 @@ class EvaluationUtil:
 
             # Get raw embeddings
             with torch.no_grad():
-                # try:
-                outputs = model(**batch, output_hidden_states=True, return_dict=True, **args)
-                # except Exception as e:
-                #     outputs = model(**batch, output_hidden_states=True, return_dict=True)
+                outputs = model(**batch, output_hidden_states=True, return_dict=True, **args if args else {})
 
-            pooler_output=outputs.pooler_output
-            last_hidden_state=outputs.last_hidden_state,
-            hidden_states=outputs.hidden_states,
-
-            return pooler_output.cpu()
-
-            # return pooler(
-            #                 attention_mask = batch['attention_mask'],
-            #                 outputs = outputs).cpu()
+            return pooler(attention_mask = batch['attention_mask'],
+                        outputs = outputs,
+                        input_ids = batch['input_ids'],
+                        mask_token_id = tokenizer.mask_token_id).cpu()
 
         results = {}
 

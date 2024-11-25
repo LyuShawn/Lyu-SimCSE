@@ -197,16 +197,22 @@ def main():
         model.prompt_prefix_origin_input_ids = tokenizer.encode(model_args.prompt_prefix, add_special_tokens=False)
         model.prompt_suffix_origin_input_ids = tokenizer.encode(model_args.prompt_suffix, add_special_tokens=False)
 
-        # if model_args.eval_template:
-        #     # 如果有eval_template，就使用eval_template
-        #     eval_template = model_args.eval_template.replace('[MASK]', tokenizer.mask_token)
-        #     eval_prefix = eval_template.split('{sentence}')[0]
-        #     eval_suffix = eval_template.split('{sentence}')[1]
-        #     model_args.eval_prefix_input_ids = tokenizer.encode(eval_prefix)[:-1]
-        #     model_args.eval_suffix_input_ids = tokenizer.encode(eval_suffix)[1:]
-        # else:
-        #     model_args.eval_prefix_input_ids = model_args.prompt_prefix_input_ids
-        #     model_args.eval_suffix_input_ids = model_args.prompt_suffix_input_ids
+        if model_args.eval_template:
+            # 如果有eval_template，就使用eval_template
+            eval_template = model_args.eval_template.replace('[MASK]', tokenizer.mask_token)
+            eval_prefix = eval_template.split('{sentence}')[0]
+            eval_suffix = eval_template.split('{sentence}')[1]
+            model.eval_prefix_input_ids = tokenizer.encode(eval_prefix)[:-1]
+            model.eval_suffix_input_ids = tokenizer.encode(eval_suffix)[1:]
+
+            model.eval_prefix_origin_input_ids = tokenizer.encode(eval_prefix, add_special_tokens=False)
+            model.eval_suffix_origin_input_ids = tokenizer.encode(eval_suffix, add_special_tokens=False)
+
+        else:
+            model.eval_prefix_input_ids = model.prompt_prefix_input_ids
+            model.eval_suffix_input_ids = model.prompt_suffix_input_ids
+            model.eval_prefix_origin_input_ids = model.prompt_prefix_origin_input_ids
+            model.eval_suffix_origin_input_ids = model.prompt_suffix_origin_input_ids
 
 
     prepare_features_args = PrepareFeaturesArgs(

@@ -83,46 +83,52 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         input_ids = []
         attention_mask = []
         for i,s in enumerate(sentences):
+            # sent做encode
+            sent = s
+            s = tokenizer.encode(s, add_special_tokens=False,
+                    max_length=data_args.max_seq_length,
+                    truncation=True,
+                    padding="max_length" if data_args.pad_to_max_length else False,)
 
             if knowledge_mark in model_args.prompt_template:
                 knowledge = knowledge_list[i % total]
                 if knowledge:
-                    template = model_args.prompt_template.replace(knowledge_mark, knowledge)
+                    template = model_args.prompt_template
                 else:
                     template = model_args.eval_template
 
-                prompt_prefix = template.split(knowledge_mark)[0]
-                prompt_suffix = template.split(knowledge_mark)[1]
-                prompt_prefix_input_ids = tokenizer(prompt_prefix)['input_ids']
-                prompt_suffix_input_ids = tokenizer(prompt_suffix)['input_ids']
+                prompt_prefix = template.split('{sentence}')[0]
+                prompt_suffix = template.split('{sentence}')[1]
+                prompt_prefix_input_ids = tokenizer.encode(prompt_prefix)
+                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix)
 
-                prompt_prefix_input_ids = prompt_prefix_input_ids[:-1]
-                prompt_suffix_input_ids = prompt_suffix_input_ids[1:]
+                prompt_prefix_input_ids = prompt_prefix_input_ids[:-1]  # 去掉[SEP]
+                prompt_suffix_input_ids = prompt_suffix_input_ids[1:]   # 去掉[CLS]
 
-            s = tokenizer.encode(s, add_special_tokens=False,
-                                max_length=data_args.max_seq_length,
-                                truncation=True,
-                                padding="max_length" if data_args.pad_to_max_length else False,)
-
-            # 处理拼接input_ids
-            if i < total:
-                # 不处理对齐，直接拼接
-                if model_args.knowledge_fusion_type == "positive":
-                    # 原句子做和prompt后的句子做正样例
-                    input_ids.append(s['input_ids'])
-                elif model_args.knowledge_fusion_type == "knowledge_positive":
-                    # eval_template中的句子和融入的知识做正样例
-                    input_ids.append(eval_prefix_input_ids + s['input_ids'] + eval_suffix_input_ids)
-                else:
+                if i < total:
+                    # 不处理对齐，直接拼接
+                    if model_args.knowledge_fusion_type == "positive":
+                        # 原句子做和prompt后的句子做正样例
+                        s= tokenizer.encode(sent,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
+                        input_ids.append(s)
+                    elif model_args.knowledge_fusion_type == "knowledge_positive":
+                        # eval_template中的句子和融入的知识做正样例
+                        input_ids.append(eval_prefix_input_ids + s + eval_suffix_input_ids)
+                    else:
+                        input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
+                elif i < total*2:
                     input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
-            elif i < total*2:
-                input_ids.append(prompt_prefix_input_ids2 + s + prompt_suffix_input_ids2)
-            else:
-                if not s:
-                    input_ids.append([])
                 else:
-                    s = tokenizer(s,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-                    input_ids.append(eval_prefix_input_ids + s['input_ids'] + eval_suffix_input_ids)
+                    raise NotImplementedError
+
+            else:
+                # prompt_bert
+                if i < total:
+                    input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
+                elif i < total*2:
+                    input_ids.append(prompt_prefix_input_ids2 + s + prompt_suffix_input_ids2)
+                else:
+                    raise NotImplementedError
 
             if model_args.mask_prompt:
                 # mask prompt，prompt是0
