@@ -59,7 +59,7 @@ class EvaluationUtil:
         if hasattr(model_args, "do_prompt_enhancement"):
             self.pooler_type = "mask" if model_args.do_prompt_enhancement else self.pooler_type
 
-        self.pooler = Pooler(model_args.pooler_type).to(self.device)
+        self.pooler = Pooler(self.pooler_type).to(self.device)
 
         self.local_model = os.path.exists(path)
         self.base_path = path
