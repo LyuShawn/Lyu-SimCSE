@@ -37,7 +37,7 @@
                 // "--knowledge_hard_negative",
                 // "--knowledge_fusion_type", "positive",
                 "--eval_template", "This sentence of '{sentence}' means [MASK].",
-                // "--knowledge_retrieve_type", "summary",
+                "--knowledge_retrieve_type", "summary",
                 // "--hard_negative_weight", "0"
             ],
             "justMyCode": false

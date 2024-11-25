@@ -78,7 +78,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
 
         if knowledge_mark in model_args.prompt_template:
-            knowledge_list = retrieval_knowledge_batch(examples[sent0_cname], retrieve_type=args.model_args.knowledge_retrieve_type)
+            knowledge_list = retrieval_knowledge_batch(examples[sent0_cname], retrieve_type=args.model_args.knowledge_retrieve_type,max_length=args.model_args.knowledge_max_length)
 
         input_ids = []
         attention_mask = []

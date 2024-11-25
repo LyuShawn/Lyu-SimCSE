@@ -67,3 +67,38 @@ def retrieval_knowledge_batch(sent_list, retrieve_type = 'title', max_length = -
                 knowledge += item["title"] + ","
             result.append(knowledge[:-1])  # 去掉最后的逗号
         return result
+
+    if retrieve_type == 'summary':
+        redis_client = RedisClient()
+        search_prifix = "wikisearch:"
+
+        keys = [search_prifix + text_encode(sent) for sent in sent_list]
+        values = redis_client.mget(keys)
+        page_ids = []
+        for value in values:
+            if not value:
+                page_ids.append(None)
+                continue
+            value = json.loads(value)
+            if not value:
+                page_ids.append(None)
+                continue
+
+            # 获取第一个pageid
+            page_id = value[0]["page_id"]
+            page_ids.append(page_id)
+        page_prifix = "wikipage:"
+        keys = [page_prifix + str(page_id) for page_id in page_ids]
+        values = redis_client.mget(keys)
+        result = []
+        for value in values:
+            if not value:
+                result.append(None)
+                continue
+            summary = json.loads(value)["summary"]
+            if max_length == -1:
+                result.append(summary)
+            else:
+                summary = summary.split()[0:max_length]
+                result.append(" ".join(summary))
+        return result
