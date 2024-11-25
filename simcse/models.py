@@ -211,7 +211,7 @@ class Pooler(nn.Module):
 
         if kwargs.get("do_prompt_enhancement"):
             if kwargs.get("knowledge_fusion_type") == "positive":
-                self.pooler_type = "half_mask"
+                self.pooler_type = "mask"
             else:
                 self.pooler_type = "mask"
         else:
