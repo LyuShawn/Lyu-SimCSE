@@ -45,7 +45,7 @@ def retrieve_knowledge(sent, retrieve_type = 'title', max_length = -1):
         value = json.loads(redis_client.get(key))
         return value
 
-def retrieval_knowledge_batch(sent_list, retrieve_type = 'title', max_length = -1,title_num=-1):
+def retrieval_knowledge_batch(sent_list, retrieve_type = 'title', max_length = -1):
     """
         批量查询知识
     """
@@ -61,8 +61,8 @@ def retrieval_knowledge_batch(sent_list, retrieve_type = 'title', max_length = -
                 result.append([])
                 continue
             value = json.loads(value)
-            if title_num != -1:
-                result.append([item["title"] for item in value][:title_num])
+            if max_length != -1:
+                result.append([item["title"] for item in value][:max_length])
             else:
                 result.append([item["title"] for item in value])            
             # # 组装知识，把所有title拼接起来
