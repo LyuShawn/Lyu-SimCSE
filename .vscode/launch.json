@@ -26,7 +26,7 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                // "--overwrite_cache",
+                "--overwrite_cache",
                 "--do_prompt_enhancement",
                 "--sample_data","10000",
                 // "--batch_inner_shuffle",
@@ -37,7 +37,7 @@
                 // "--knowledge_hard_negative",
                 // "--knowledge_fusion_type", "positive",
                 "--eval_template", "This sentence of '{sentence}' means [MASK].",
-                "--knowledge_retrieve_type", "summary",
+                "--knowledge_retrieve_type", "title",
                 // "--hard_negative_weight", "0"
             ],
             "justMyCode": false

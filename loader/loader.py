@@ -94,6 +94,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 knowledge = knowledge_list[i % total]
                 if knowledge:
                     template = model_args.prompt_template
+                    knowledge = ",".join(knowledge)
+                    template = template.replace(knowledge_mark, knowledge)
                 else:
                     template = model_args.eval_template
 
