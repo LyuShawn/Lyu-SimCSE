@@ -156,24 +156,10 @@ class ModelArguments:
         }
     )
 
-    mask_prompt: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use prompt bert mask."
-        }
-    )
-
-    do_knowledge_fusion: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use knowledge fusion."
-        }
-    )
-
-    knowledge_fusion_type: Literal["full","selective","fusion_loss","positive","knowledge_positive"] = field(
+    knowledge_fusion: Literal["","positive","knowledge_positive","full","selective","fusion_loss"] = field(
         default="",
         metadata={
-            "help": "The type of knowledge fusion."
+            "help": "是否使用知识融合。positive为融合知识的句子做自监督，knowledge_positive为知识和无知识"
         }
     )
 

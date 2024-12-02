@@ -123,9 +123,9 @@ def main():
         )
 
     # # 添加特殊token
-    # if model_args.do_knowledge_fusion:
-    #     tokenizer.add_special_tokens({'additional_special_tokens': ['[KNOWLEDGE]']})
-    #     model_args.knowledge_token_id = tokenizer.convert_tokens_to_ids('[KNOWLEDGE]')
+    if model_args.knowledge_fusion:
+        tokenizer.add_special_tokens({'additional_special_tokens': ['[KNOWLEDGE]']})
+        model_args.knowledge_token_id = tokenizer.convert_tokens_to_ids('[KNOWLEDGE]')
 
     # 加载模型
     logger.info("********* Load Model *********")
@@ -183,37 +183,20 @@ def main():
 
     model.mask_token_id = tokenizer.mask_token_id
     model.pad_token_id = tokenizer.pad_token_id
+    model.cls_token_id = tokenizer.cls_token_id
+    model.sep_token_id = tokenizer.sep_token_id
+
     if model_args.do_prompt_enhancement:
+        model_args.knowledge_mark = "[knowledge]"
+        model_args.sent_mark = "[sentence]"
 
-        template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
-
-        model_args.prompt_prefix = template.split('{sentence}')[0]    
-        model_args.prompt_suffix = template.split('{sentence}')[1]
-
-        model.prompt_prefix_input_ids = tokenizer.encode(model_args.prompt_prefix)[:-1]
-        model.prompt_suffix_input_ids = tokenizer.encode(model_args.prompt_suffix)[1:]
-
-        model.prompt_prefix_origin_input_ids = tokenizer.encode(model_args.prompt_prefix, add_special_tokens=False)
-        model.prompt_suffix_origin_input_ids = tokenizer.encode(model_args.prompt_suffix, add_special_tokens=False)
+        model_args.prompt_template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
 
         if model_args.eval_template:
-            # 如果有eval_template，就使用eval_template
-            eval_template = model_args.eval_template.replace('[MASK]', tokenizer.mask_token)
-            eval_prefix = eval_template.split('{sentence}')[0]
-            eval_suffix = eval_template.split('{sentence}')[1]
-            model.eval_prefix_input_ids = tokenizer.encode(eval_prefix)[:-1]
-            model.eval_suffix_input_ids = tokenizer.encode(eval_suffix)[1:]
-
-            model.eval_prefix_origin_input_ids = tokenizer.encode(eval_prefix, add_special_tokens=False)
-            model.eval_suffix_origin_input_ids = tokenizer.encode(eval_suffix, add_special_tokens=False)
-
+            model_args.eval_template = model_args.eval_template.replace('[MASK]', tokenizer.mask_token)
         else:
-            model_args.eval_template = model_args.prompt_template
-            model.eval_prefix_input_ids = model.prompt_prefix_input_ids
-            model.eval_suffix_input_ids = model.prompt_suffix_input_ids
-            model.eval_prefix_origin_input_ids = model.prompt_prefix_origin_input_ids
-            model.eval_suffix_origin_input_ids = model.prompt_suffix_origin_input_ids
-
+            model_args.eval_template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
+        
 
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,

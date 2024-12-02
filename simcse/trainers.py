@@ -25,6 +25,7 @@ class CLTrainer(Trainer):
             tokenizer = self.tokenizer,
             tasks = tasks,
             params = params,
+            model_args = self.model_args,
         )
 
         results = EvaluationUtil.process_result(results,tasks,mode="dev")

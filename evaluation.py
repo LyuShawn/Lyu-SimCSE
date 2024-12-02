@@ -247,7 +247,7 @@ class EvaluationUtil:
         return results
 
     @classmethod
-    def dev_eval(cls,model,tokenizer,tasks,params):
+    def dev_eval(cls,model,tokenizer,tasks,params, model_args):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -262,6 +262,11 @@ class EvaluationUtil:
                 "utf-8") for word in s] for s in batch]
 
             sentences = [" ".join(s) for s in batch]
+
+            if model_args.do_prompt_enhancement:
+                template = model_args.prompt_template
+                sentences = [template.replace(model_args.sent_mark, s) for s in sentences]
+
             batch = tokenizer(
                 sentences,
                 return_tensors="pt",

@@ -31,19 +31,19 @@ class OurDataCollatorWithPadding:
             import random
             random.shuffle(features)
 
-        if self.model_args.do_knowledge_fusion:
-            # 保存并移除sent_knowledge_intput_ids
-            sent_knowledge_input_ids = [item.pop('sent_knowledge') for item in features]
-            sent_knowledge_attention_mask = []
-            # 对齐
-            ml = max([len(i) for i in sent_knowledge_input_ids])
-            l = len(sent_knowledge_input_ids)
-            for i in range(l):
-                # 先做attention_mask，再做input对齐
-                sent_knowledge_attention_mask.append([1] * len(sent_knowledge_input_ids[i]) + [0] * (ml-len(sent_knowledge_input_ids[i])))
-                sent_knowledge_input_ids[i] = sent_knowledge_input_ids[i] + [self.tokenizer.pad_token_id]*(ml-len(sent_knowledge_input_ids[i]))
-            sent_knowledge_input_ids = torch.tensor(sent_knowledge_input_ids, dtype=torch.long)
-            sent_knowledge_attention_mask = torch.tensor(sent_knowledge_attention_mask, dtype=torch.long)
+        # if self.model_args.do_knowledge_fusion:
+        #     # 保存并移除sent_knowledge_intput_ids
+        #     sent_knowledge_input_ids = [item.pop('sent_knowledge') for item in features]
+        #     sent_knowledge_attention_mask = []
+        #     # 对齐
+        #     ml = max([len(i) for i in sent_knowledge_input_ids])
+        #     l = len(sent_knowledge_input_ids)
+        #     for i in range(l):
+        #         # 先做attention_mask，再做input对齐
+        #         sent_knowledge_attention_mask.append([1] * len(sent_knowledge_input_ids[i]) + [0] * (ml-len(sent_knowledge_input_ids[i])))
+        #         sent_knowledge_input_ids[i] = sent_knowledge_input_ids[i] + [self.tokenizer.pad_token_id]*(ml-len(sent_knowledge_input_ids[i]))
+        #     sent_knowledge_input_ids = torch.tensor(sent_knowledge_input_ids, dtype=torch.long)
+        #     sent_knowledge_attention_mask = torch.tensor(sent_knowledge_attention_mask, dtype=torch.long)
 
         flat_features = []
         for feature in features:
@@ -63,8 +63,8 @@ class OurDataCollatorWithPadding:
         attention_mask = torch.tensor(attention_mask, dtype=torch.long)
         batch = {"input_ids": input_ids, "attention_mask": attention_mask}
 
-        if self.model_args.do_knowledge_fusion:
-            batch['sent_knowledge'] = {'input_ids': sent_knowledge_input_ids, 'attention_mask': sent_knowledge_attention_mask}
+        # if self.model_args.do_knowledge_fusion:
+        #     batch['sent_knowledge'] = {'input_ids': sent_knowledge_input_ids, 'attention_mask': sent_knowledge_attention_mask}
 
         if self.do_mlm:
             batch["mlm_input_ids"], batch["mlm_labels"] = self.mask_tokens(batch["input_ids"])
