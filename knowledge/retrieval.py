@@ -106,3 +106,13 @@ def retrieval_knowledge_batch(sent_list, retrieve_type = 'title', max_length = -
                 summary = summary.split()[0:max_length]
                 result.append(" ".join(summary))
         return result
+
+    if retrieve_type == 'sentence':
+        redis_client = RedisClient(db=2)
+        prifix = "similarity_sent_"
+        keys = [prifix + text_encode(sent) for sent in sent_list]
+        values = redis_client.mget(keys)
+        result = []
+        for value in values:
+            result.append(json.loads(value))
+        return result
