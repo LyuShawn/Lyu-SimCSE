@@ -511,32 +511,39 @@ def sentemb_forward(
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
     if cls.model_args.do_prompt_enhancement:
-
-        new_input_ids = []
-
-        prompt_prefix = torch.LongTensor(cls.eval_prefix_origin_input_ids).to(input_ids.device)
-        prompt_suffix = torch.LongTensor(cls.eval_suffix_origin_input_ids).to(input_ids.device)
-
         # input_ids: (bs, len)
-        for sent in input_ids:
-            len = sent.shape[0]
-            origin_sent = sent[sent != cls.pad_token_id]
+        batch_size, seq_len = input_ids.shape
 
-            new_input = [origin_sent[:1], prompt_prefix]        # cls + prompt_prefix
-            if origin_sent.shape[0] > 2:
-                new_input += [origin_sent[1:-1]]                # + origin_sent
-            new_input += [prompt_suffix, origin_sent[-1:]]      # + prompt_suffix + sep
-            if origin_sent.shape[0] < len:
-                new_input += [sent[sent == cls.pad_token_id]]   # + pad
-            new_input = torch.cat(new_input)
+        device = input_ids.device
 
-            # [cls] + prompt_prefix + origin_sent + prompt_suffix + [sep]   # 都不含特殊token
-            assert sent.shape[0] + prompt_prefix.shape[0] + prompt_suffix.shape[0] == new_input.shape[0]
+        prompt_prefix = torch.LongTensor(cls.eval_prefix_origin_input_ids).to(device)
+        prompt_suffix = torch.LongTensor(cls.eval_suffix_origin_input_ids).to(device)
 
-            new_input_ids.append(new_input)
+        mask = input_ids != cls.pad_token_id  # (batch_size, seq_len)
+        non_pad_indices = mask.sum(dim=1)  # 每个句子的有效长度
 
-        input_ids = torch.stack(new_input_ids, dim=0)
-        attention_mask = (input_ids != cls.pad_token_id).long()
+        new_input_ids = torch.full(
+            (batch_size, seq_len + prompt_prefix.shape[0] + prompt_suffix.shape[0]),
+            cls.pad_token_id,
+            dtype=torch.long
+        ).to(device)
+
+        for i in range(batch_size):
+            origin_sent = input_ids[i, :non_pad_indices[i]]  # 非 PAD 部分
+            new_input = torch.cat([
+                prompt_prefix,           # CLS + 前缀
+                origin_sent[:-1],        # 原句内容（去掉最后一个 token）
+                prompt_suffix,           # 后缀
+                origin_sent[-1:]         # 最后一个 token
+            ])
+            new_input_ids[i, :new_input.shape[0]] = new_input
+
+        # 验证尺寸
+        expected_length = seq_len + prompt_prefix.shape[0] + prompt_suffix.shape[0]
+        assert new_input_ids.shape == (batch_size, expected_length)
+
+        input_ids = new_input_ids
+        attention_mask = (input_ids != cls.pad_token_id).long().to(device)
         token_type_ids = None
         pooler_type = "mask"
 
