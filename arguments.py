@@ -184,6 +184,13 @@ class ModelArguments:
         }
     )
 
+    knowledge_loss_type: Literal["","l1","l2","energy_based","mse"] = field(
+        default="",
+        metadata={
+            "help": "The type of knowledge loss."
+        }
+    )
+
     knowledge_attention_strength: float = field(
         default=1.0,
         metadata={

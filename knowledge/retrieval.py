@@ -77,7 +77,7 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         # 先拼接再截断
         for knowledge in knowledge_list:
             if not knowledge:
-                result.append([])
+                result.append("")
                 continue
             knowledge = ",".join(knowledge)
             if max_length == -1:
@@ -85,7 +85,6 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
             else:
                 knowledge = knowledge[0:max_length]
                 result.append(knowledge)
-
         return result
     elif retrieve_type=="summary":
         return retrieval_knowledge_summary(sent_list,max_length)

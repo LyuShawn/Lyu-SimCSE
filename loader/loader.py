@@ -136,15 +136,17 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             features[key] = [[sent_features[key][i], sent_features[key][i+total]] for i in range(total)]
 
     if model_args.do_knowledge_fusion:
-        sent_knowledge_list = []
+        # 处理knowledge_list
+        template = model_args.eval_template
+        knowledge_list = [template.replace("{sentence}", knowledge) for knowledge in knowledge_list]
         # 如果需要知识融合，对每个原始句子做知识检索，并tokenize
         sent_knowledge_features = tokenizer(
-            sent_knowledge_list,
+            knowledge_list,
             max_length=256,
             truncation=True,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
-        features['sent_knowledge'] = sent_knowledge_features['input_ids']
+        features['sent_knowledge'] = sent_knowledge_features["input_ids"]
 
     return features

@@ -36,6 +36,9 @@
                 "--eval_steps", "25",
                 // "--knowledge_hard_negative",
                 // "--knowledge_fusion_type", "knowledge_positive",
+                "--do_knowledge_fusion",
+                "--knowledge_loss_type","l2",
+                "--knowledge_loss_weight","1e-2",
                 "--eval_template", "This sentence of '{sentence}' means [MASK].",
                 "--knowledge_retrieve_type", "title",
                 // "--hard_negative_weight", "0"

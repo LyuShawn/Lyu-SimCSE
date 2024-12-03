@@ -273,12 +273,12 @@ def cl_init(cls, config):
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
 
-    if cls.model_args.do_knowledge_fusion:
-        # cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
-        #                                         cls.model_args).to(cls.device)
-        cls.knowledge_fusion = CrossAttentionLayer(config.hidden_size, 
-                                                    cls.model_args.knowledge_attention_head_num, 
-                                                    cls.model_args.knowledge_attention_dropout).to(cls.device)
+    # if cls.model_args.do_knowledge_fusion:
+    #     # cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
+    #     #                                         cls.model_args).to(cls.device)
+    #     cls.knowledge_fusion = CrossAttentionLayer(config.hidden_size, 
+    #                                                 cls.model_args.knowledge_attention_head_num, 
+    #                                                 cls.model_args.knowledge_attention_dropout).to(cls.device)
 
     cls.init_weights()
 
@@ -366,40 +366,48 @@ def cl_forward(cls,
             )
 
         # 对knowledge_output进行pooling
-        knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
-        knowledge_output = knowledge_output.unsqueeze(1) # (bs, 1, hidden)
+        # (bs, len, hidden) -> (bs, hidden)
+        knowledge_output = cls.pooler(attention_mask = sent_knowledge["attention_mask"], 
+                                    outputs = knowledge_output, 
+                                    input_ids = sent_knowledge["input_ids"], 
+                                    pooler_type = "mask",
+                                    mask_token_id = cls.mask_token_id)
+        if cls.model_args.knowledge_loss_type == "l2":
+            # 计算L2正则化作为知识抑制损失
+            ksl = torch.mean(torch.norm(knowledge_output, p=2, dim=-1) ** 2) * cls.model_args.knowledge_loss_weight
+        else:
+            raise NotImplementedError
+        # # 计算empty_knowledge_mask
+        # non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
+        # empty_knowledge_mask = non_zero_count <= 2
 
-        # 计算empty_knowledge_mask
-        non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
-        empty_knowledge_mask = non_zero_count <= 2
+        # last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
 
-        last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
-
-        if cls.model_args.knowledge_fusion_type == "full":
-            z1 = cls.knowledge_fusion(
-                sentence_output=last_hidden_state[:,0,:],    # (bs, len, hidden)
-                knowledge_emb=knowledge_output, # (bs, hidden)
-                empty_knowledge_mask=empty_knowledge_mask)
-            z2 = cls.knowledge_fusion(
-                sentence_output=last_hidden_state[:,1,:],    # (bs, len, hidden)
-                knowledge_emb=knowledge_output, # (bs, hidden)
-                empty_knowledge_mask=empty_knowledge_mask)
-        elif cls.model_args.knowledge_fusion_type == "selective":
-            # z1, z2 = pooler_output[:,0], mask_attn_output + pooler_output[:,1]
-            z1 = last_hidden_state[:,0,:]
-            z2 = cls.knowledge_fusion(
-                sentence_output=last_hidden_state[:,1,:],    # (bs, len, hidden)
-                knowledge_emb=knowledge_output, # (bs, hidden)
-                empty_knowledge_mask=empty_knowledge_mask)
-        elif cls.model_args.knowledge_fusion_type == "fusion_loss":
-            z1, z2 = last_hidden_state[:,0,:], last_hidden_state[:,1,:]
-            z3 = cls.knowledge_fusion(
-                sentence_output=last_hidden_state[:,0,:],    # (bs, len, hidden)
-                knowledge_emb=knowledge_output, # (bs, hidden)
-                empty_knowledge_mask=empty_knowledge_mask)
-            z3 = z3[:,0,:]
-        z1 = z1[:,0,:]
-        z2 = z2[:,0,:]
+        # if cls.model_args.knowledge_fusion_type == "full":
+        #     z1 = cls.knowledge_fusion(
+        #         sentence_output=last_hidden_state[:,0,:],    # (bs, len, hidden)
+        #         knowledge_emb=knowledge_output, # (bs, hidden)
+        #         empty_knowledge_mask=empty_knowledge_mask)
+        #     z2 = cls.knowledge_fusion(
+        #         sentence_output=last_hidden_state[:,1,:],    # (bs, len, hidden)
+        #         knowledge_emb=knowledge_output, # (bs, hidden)
+        #         empty_knowledge_mask=empty_knowledge_mask)
+        # elif cls.model_args.knowledge_fusion_type == "selective":
+        #     # z1, z2 = pooler_output[:,0], mask_attn_output + pooler_output[:,1]
+        #     z1 = last_hidden_state[:,0,:]
+        #     z2 = cls.knowledge_fusion(
+        #         sentence_output=last_hidden_state[:,1,:],    # (bs, len, hidden)
+        #         knowledge_emb=knowledge_output, # (bs, hidden)
+        #         empty_knowledge_mask=empty_knowledge_mask)
+        # elif cls.model_args.knowledge_fusion_type == "fusion_loss":
+        #     z1, z2 = last_hidden_state[:,0,:], last_hidden_state[:,1,:]
+        #     z3 = cls.knowledge_fusion(
+        #         sentence_output=last_hidden_state[:,0,:],    # (bs, len, hidden)
+        #         knowledge_emb=knowledge_output, # (bs, hidden)
+        #         empty_knowledge_mask=empty_knowledge_mask)
+        #     z3 = z3[:,0,:]
+        # z1 = z1[:,0,:]
+        # z2 = z2[:,0,:]
 
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
@@ -427,10 +435,8 @@ def cl_forward(cls,
 
     loss = loss_fct(cos_sim, labels)
 
-    if cls.model_args.do_knowledge_fusion and cls.model_args.knowledge_fusion_type == "fusion_loss":
-        knowledge_sim = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
-        fusion_loss = loss_fct(knowledge_sim, labels)
-        loss = loss + cls.model_args.knowledge_loss_weight * fusion_loss
+    if cls.model_args.do_knowledge_fusion:
+        loss = loss * (1 + ksl)
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:
