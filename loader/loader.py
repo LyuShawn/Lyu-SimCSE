@@ -1,6 +1,4 @@
-from utils.sentence_util import text_encode
-import json
-from knowledge.retrieval import retrieve_knowledge,retrieval_knowledge_batch
+from knowledge.retrieval import retrieval_knowledge
 
 class PrepareFeaturesArgs:
     def __init__(self, tokenizer, data_args, model_args, sent0_cname, sent1_cname, sent2_cname):
@@ -33,21 +31,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
     sentences = examples[sent0_cname] + examples[sent1_cname]
 
-    if model_args.knowledge_hard_negative:
-        knowledge_hard_sent_list = []
-        threshold = 0.9
-        for s in examples[sent0_cname]:
-            knowledge_sent_list = retrieve_knowledge(s, retrieve_type='sentence') # [(cos_sim, sent)]
-            knowledge_hard_sent = ""
-            if knowledge_sent_list:
-                # 选择相似度小于0.9的最大的句子
-                knowledge_sent_list = [(cos_sim, sent) for cos_sim, sent in knowledge_sent_list if cos_sim < threshold]
-                if knowledge_sent_list:
-                    knowledge_sent_list.sort(key=lambda x: x[0], reverse=True)
-                    knowledge_hard_sent = knowledge_sent_list[0][1]
-            knowledge_hard_sent_list.append(knowledge_hard_sent)
-        sentences += knowledge_hard_sent_list
-
     knowledge_mark = "{knowledge}"
 
     # 如果有第三个句子
@@ -78,7 +61,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
 
         if knowledge_mark in model_args.prompt_template:
-            knowledge_list = retrieval_knowledge_batch(examples[sent0_cname], retrieve_type=args.model_args.knowledge_retrieve_type,max_length=args.model_args.knowledge_max_length)
+            knowledge_list = retrieval_knowledge(examples[sent0_cname], retrieve_type=args.model_args.knowledge_retrieve_type,max_length=args.model_args.knowledge_max_length)
 
         input_ids = []
         attention_mask = []
@@ -93,9 +76,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             if knowledge_mark in model_args.prompt_template:
                 knowledge = knowledge_list[i % total]
                 if knowledge:
-                    template = model_args.prompt_template
-                    knowledge = ",".join(knowledge)
-                    template = template.replace(knowledge_mark, knowledge)
+                    template = model_args.prompt_template.replace(knowledge_mark, knowledge)
                 else:
                     template = model_args.eval_template
 
@@ -133,13 +114,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     raise NotImplementedError
 
-            if model_args.mask_prompt:
-                # mask prompt，prompt是0
-                attention_mask.append([0] * len(prompt_prefix_input_ids) + s['attention_mask'] + [0] * len(prompt_suffix_input_ids))
-            else:
-                # 不mask prompt，全关注
-                attention_mask.append([1] * len(input_ids[-1]))
-                # attention_mask.append([1] * (len(prompt_prefix_input_ids) + len(s['attention_mask']) + len(prompt_suffix_input_ids)))
+            attention_mask.append([1] * len(input_ids[-1]))
+
         sent_features['input_ids'] = input_ids
         sent_features['attention_mask'] = attention_mask
 
@@ -162,9 +138,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
     if model_args.do_knowledge_fusion:
         sent_knowledge_list = []
         # 如果需要知识融合，对每个原始句子做知识检索，并tokenize
-        for sent in examples[sent0_cname]:
-            knowledge = retrieve_knowledge(sent, args.model_args.knowledge_retrieve_type)
-            sent_knowledge_list.append(knowledge if knowledge else "")
         sent_knowledge_features = tokenizer(
             sent_knowledge_list,
             max_length=256,

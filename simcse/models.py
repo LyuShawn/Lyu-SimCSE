@@ -342,48 +342,6 @@ def cl_forward(cls,
         )
 
     # Pooling
-
-    # if cls.model_args.do_prompt_enhancement:
-    #     if cls.model_args.do_knowledge_fusion:
-    #         # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
-    #         if cls.knowledge_encoder is not None:
-    #             knowledge_output = cls.knowledge_encoder(
-    #                 **sent_knowledge,
-    #                 return_dict=True,
-    #             )
-    #         else:
-    #             knowledge_output = encoder(
-    #                 **sent_knowledge,
-    #                 return_dict=True,
-    #             )
-    #         # 对knowledge_output进行pooling
-    #         knowledge_output = knowledge_output.last_hidden_state[:, 0, :]  # (bs, hidden)
-
-    #         # 计算empty_knowledge_mask
-    #         non_zero_count = torch.count_nonzero(sent_knowledge["input_ids"], dim=-1) # (bs)
-    #         empty_knowledge_mask = non_zero_count <= 2
-
-    #         last_hidden_state = outputs.last_hidden_state.view(batch_size, num_sent, -1, outputs.last_hidden_state.size(-1)) # (bs, num_sent, len, hidden)
-    #         # 取一半
-    #         last_hidden_state = last_hidden_state[:,1,:]    # (bs, len, hidden)
-
-    #         # 原ori_input_ids取一半
-    #         sent_input_ids = ori_input_ids[:,0,:]    # (bs, len)
-    #         # 进行知识融合  (bs, hidden)
-    #         mask_attn_output = cls.knowledge_fusion(
-    #             model_output=last_hidden_state,
-    #             input_ids=sent_input_ids,    # (bs , len)
-    #             knowledge_output = knowledge_output, # (bs, hidden)
-    #             empyt_knowledge_mask = empty_knowledge_mask, # (bs)
-    #             # knowledge_token_id = cls.model_args.knowledge_token_id,
-    #             mask_token_id = cls.mask_token_id)
-
-    #     # if cls.model_args.pooler_type == "cls":
-
-    #     pooler_output = outputs.last_hidden_state[input_ids == cls.mask_token_id]
-    
-    #     pooler_output = pooler_output.view(batch_size * num_sent, -1) # (bs * num_sent, hidden)
-    # else:
         
     pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id)
 
