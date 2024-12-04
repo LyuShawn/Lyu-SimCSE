@@ -94,7 +94,7 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         knowledge_list = retrieval_knowledge_title(sent_list)
         for k in knowledge_list:
             if k:
-                result.append("'{knowledge}'")
+                result.append("{knowledge}")
             else:
                 result.append("")
         return result
