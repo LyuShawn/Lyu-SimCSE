@@ -90,3 +90,13 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         return retrieval_knowledge_summary(sent_list,max_length)
     elif retrieve_type=="sentence":
         return retrieval_knowledge_sentence(sent_list,max_length)
+    elif retrieve_type=="empty":
+        knowledge_list = retrieval_knowledge_title(sent_list)
+        for k in knowledge_list:
+            if k:
+                result.append("'{knowledge}'")
+            else:
+                result.append("")
+        return result
+    else:
+        raise NotImplementedError

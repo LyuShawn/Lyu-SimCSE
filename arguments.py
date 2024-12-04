@@ -226,7 +226,7 @@ class ModelArguments:
         }
     )
 
-    knowledge_retrieve_type: Literal["title","summary"] = field(
+    knowledge_retrieve_type: Literal["title","summary","empty"] = field(
         default="title",
         metadata={
             "help": "The type of knowledge fusion."
