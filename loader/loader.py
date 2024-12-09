@@ -84,11 +84,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
                 prompt_prefix = template.split('{sentence}')[0]
                 prompt_suffix = template.split('{sentence}')[1]
-                prompt_prefix_input_ids = tokenizer.encode(prompt_prefix)
-                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix)
-
-                prompt_prefix_input_ids = prompt_prefix_input_ids[:-1]  # 去掉[SEP]
-                prompt_suffix_input_ids = prompt_suffix_input_ids[1:]   # 去掉[CLS]
+                prompt_prefix_input_ids = tokenizer.encode(prompt_prefix)[:-1]
+                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix)[:1]
 
                 if i < total:
                     # 不处理对齐，直接拼接

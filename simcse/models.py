@@ -210,10 +210,7 @@ class Pooler(nn.Module):
         super().__init__()
 
         if kwargs.get("do_prompt_enhancement"):
-            if kwargs.get("knowledge_fusion_type") == "positive":
-                self.pooler_type = "mask"
-            else:
-                self.pooler_type = "mask"
+            self.pooler_type = "mask"
         else:
             self.pooler_type = pooler_type
 
@@ -272,13 +269,6 @@ def cl_init(cls, config):
     if cls.model_args.pooler_type == "cls":
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
-
-    # if cls.model_args.do_knowledge_fusion:
-    #     # cls.knowledge_fusion = KnowledgeFussion(config.hidden_size, 
-    #     #                                         cls.model_args).to(cls.device)
-    #     cls.knowledge_fusion = CrossAttentionLayer(config.hidden_size, 
-    #                                                 cls.model_args.knowledge_attention_head_num, 
-    #                                                 cls.model_args.knowledge_attention_dropout).to(cls.device)
 
     cls.init_weights()
 
