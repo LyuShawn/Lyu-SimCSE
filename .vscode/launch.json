@@ -24,9 +24,10 @@
             "console": "integratedTerminal",
             "args": [
                 "--output_dir", "result/debug", "--debug_mode",
+                "--preprocessing_num_workers", "4",
                 "--do_train", 
                 "--do_eval",
-                // "--overwrite_cache",
+                "--overwrite_cache",
                 // "--do_prompt_enhancement",
                 // "--sample_data","10000",
                 // "--batch_inner_shuffle",

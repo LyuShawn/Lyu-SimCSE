@@ -295,11 +295,7 @@ class EvaluationUtil:
         }
         # params["seed"] = 1111
 
-        params["similarity"]= lambda s1, s2: F.cosine_similarity(
-                s1.unsqueeze(0) if s1.dim() == 0 else s1,
-                s2.unsqueeze(0) if s2.dim() == 0 else s2,
-                dim=-1
-            ).item()
+        params["similarity"]= lambda s1, s2: F.cosine_similarity(s1, s2,dim=-1).tolist()
 
         return params
 

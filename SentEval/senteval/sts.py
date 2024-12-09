@@ -72,9 +72,12 @@ class STSEval(object):
                     enc1 = batcher(params, batch1)
                     enc2 = batcher(params, batch2)
 
-                    for kk in range(enc2.shape[0]):
-                        sys_score = self.similarity(enc1[kk], enc2[kk])
-                        sys_scores.append(sys_score)
+                    # 使用并行计算相似度
+                    sys_score = self.similarity(enc1, enc2)
+                    sys_scores.extend(sys_score)
+                    # for kk in range(enc2.shape[0]):
+                    #     sys_score = self.similarity(enc1[kk], enc2[kk])
+                    #     sys_scores.append(sys_score)
             all_sys_scores.extend(sys_scores)
             all_gs_scores.extend(gs_scores)
             results[dataset] = {'pearson': pearsonr(sys_scores, gs_scores),
