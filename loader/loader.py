@@ -92,8 +92,10 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                     if model_args.knowledge_fusion_type == "knowledge_positive":
                         # eval_template中的句子和融入的知识做正样例
                         input_ids.append(eval_prefix_input_ids + s + eval_suffix_input_ids)
-                    else:
+                    elif model_args.knowledge_fusion_type == "self_positive":
                         input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
+                    else:
+                        raise NotImplementedError
                 elif i < total*2:
                     input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
                 else:

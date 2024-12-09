@@ -98,5 +98,7 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
             else:
                 result.append("")
         return result
+    elif retrieve_type=="rewrite":
+        return sent_list
     else:
         raise NotImplementedError

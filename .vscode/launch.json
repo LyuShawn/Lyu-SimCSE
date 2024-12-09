@@ -41,7 +41,7 @@
                 // "--knowledge_loss_type","l2",
                 // "--knowledge_loss_weight","1e-2",
                 "--eval_template", "This sentence of '{sentence}' means [MASK].",
-                // "--knowledge_retrieve_type", "empty",
+                "--knowledge_retrieve_type", "title",
                 // "--hard_negative_weight", "0"
             ],
             "justMyCode": false

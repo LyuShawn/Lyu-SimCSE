@@ -170,7 +170,7 @@ class ModelArguments:
         }
     )
 
-    knowledge_fusion_type: Literal["","full","selective","fusion_loss","positive","knowledge_positive"] = field(
+    knowledge_fusion_type: Literal["","full","self_positive","knowledge_positive"] = field(
         default="",
         metadata={
             "help": "The type of knowledge fusion."
@@ -226,7 +226,7 @@ class ModelArguments:
         }
     )
 
-    knowledge_retrieve_type: Literal["title","summary","empty","sentence"] = field(
+    knowledge_retrieve_type: Literal["title","summary","empty","sentence","rewrite"] = field(
         default="title",
         metadata={
             "help": "The type of knowledge fusion."
