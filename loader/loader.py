@@ -85,16 +85,11 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 prompt_prefix = template.split('{sentence}')[0]
                 prompt_suffix = template.split('{sentence}')[1]
                 prompt_prefix_input_ids = tokenizer.encode(prompt_prefix)[:-1]
-                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix)[:1]
+                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix)[1:]
 
                 if i < total:
                     # 不处理对齐，直接拼接
-                    if model_args.knowledge_fusion_type == "positive":
-                        # 原句子做和prompt后的句子做正样例
-                        sent += tokenizer.mask_token
-                        s= tokenizer.encode(sent,max_length=data_args.max_seq_length,truncation=True,padding="max_length" if data_args.pad_to_max_length else False,)
-                        input_ids.append(s)
-                    elif model_args.knowledge_fusion_type == "knowledge_positive":
+                    if model_args.knowledge_fusion_type == "knowledge_positive":
                         # eval_template中的句子和融入的知识做正样例
                         input_ids.append(eval_prefix_input_ids + s + eval_suffix_input_ids)
                     else:

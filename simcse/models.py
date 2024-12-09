@@ -295,6 +295,7 @@ def cl_forward(cls,
     # Number of sentences in one instance
     # 2: pair instance; 3: pair instance with a hard negative
     num_sent = input_ids.size(1)
+    hidden_dim = cls.config.hidden_size # hidden size of BERT/RoBERTa
 
     mlm_outputs = None
     # Flatten input for encoding
@@ -335,7 +336,7 @@ def cl_forward(cls,
         
     pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id)
 
-    assert pooler_output.size(0) == batch_size * num_sent and pooler_output.size(1) == outputs.last_hidden_state.size(-1)
+    assert pooler_output.shape == torch.Size([batch_size * num_sent, hidden_dim])  # 优雅的assert张量形状
 
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 

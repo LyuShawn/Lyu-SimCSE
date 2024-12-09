@@ -186,6 +186,7 @@ def main():
     if model_args.do_prompt_enhancement:
 
         template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
+        model_args.template = template
 
         model_args.prompt_prefix = template.split('{sentence}')[0]    
         model_args.prompt_suffix = template.split('{sentence}')[1]
