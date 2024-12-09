@@ -76,7 +76,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             if knowledge_mark in model_args.prompt_template:
                 knowledge = knowledge_list[i % total]
                 if knowledge:
-                    knowledge = knowledge.split()[0:model_args.max_seq_length]
+                    knowledge = knowledge.split()[0:data_args.max_seq_length]
                     knowledge = " ".join(knowledge)
                     template = model_args.prompt_template.replace(knowledge_mark, knowledge)
                 else:
