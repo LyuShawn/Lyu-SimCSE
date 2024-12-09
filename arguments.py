@@ -306,7 +306,7 @@ class DataTrainingArguments:
         },
     )
     preprocessing_num_workers: Optional[int] = field(
-        default=8,
+        default=16,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
 
@@ -409,6 +409,7 @@ class OurTrainingArguments(TrainingArguments):
         default=True,
         metadata={"help": "Whether to use 16-bit (mixed) precision (through NVIDIA Apex) instead of 32-bit"},
     )
+
 
     save_total_limit: Optional[int] = field(
         default=3,

@@ -8,6 +8,7 @@ import json
 from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 from simcse.models import Pooler
+import torch.nn.functional as F
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -235,7 +236,7 @@ class EvaluationUtil:
                         outputs = outputs,
                         input_ids = batch['input_ids'],
                         mask_token_id = tokenizer.mask_token_id,
-                        use_pooler_output = use_pooler_output).cpu()
+                        use_pooler_output = use_pooler_output)
 
         results = {}
 
@@ -273,7 +274,7 @@ class EvaluationUtil:
                 batch[k] = batch[k].to(device)
             with torch.no_grad():
                 outputs = model(**batch, output_hidden_states=True, return_dict=True, sent_emb=True)
-            return outputs.pooler_output.cpu()
+            return outputs.pooler_output
             
         results = {}
         for task in tasks:
@@ -292,6 +293,14 @@ class EvaluationUtil:
             "tenacity": tenacity,
             "epoch_size": epoch_size,
         }
+        # params["seed"] = 1111
+
+        params["similarity"]= lambda s1, s2: F.cosine_similarity(
+                s1.unsqueeze(0) if s1.dim() == 0 else s1,
+                s2.unsqueeze(0) if s2.dim() == 0 else s2,
+                dim=-1
+            ).item()
+
         return params
 
 def main():

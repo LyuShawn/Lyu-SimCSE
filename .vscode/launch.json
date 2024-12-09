@@ -26,21 +26,21 @@
                 "--output_dir", "result/debug", "--debug_mode",
                 "--do_train", 
                 "--do_eval",
-                "--overwrite_cache",
-                "--do_prompt_enhancement",
-                "--sample_data","10000",
+                // "--overwrite_cache",
+                // "--do_prompt_enhancement",
+                // "--sample_data","10000",
                 // "--batch_inner_shuffle",
                 // "--prompt_template", "This sentence of '{sentence}' means [MASK].",
-                "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",
-                "--per_device_train_batch_size", "32",
-                "--eval_steps", "25",
+                // "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",
+                // "--per_device_train_batch_size", "32",
+                // "--eval_steps", "25",
                 // "--knowledge_hard_negative",
                 // "--knowledge_fusion_type", "knowledge_positive",
                 // "--do_knowledge_fusion",
                 // "--knowledge_loss_type","l2",
                 // "--knowledge_loss_weight","1e-2",
-                "--eval_template", "This sentence of '{sentence}' means [MASK].",
-                "--knowledge_retrieve_type", "empty",
+                // "--eval_template", "This sentence of '{sentence}' means [MASK].",
+                // "--knowledge_retrieve_type", "empty",
                 // "--hard_negative_weight", "0"
             ],
             "justMyCode": false
@@ -52,8 +52,8 @@
             "program": "${workspaceFolder}/evaluation.py",
             "console": "integratedTerminal",
             "args": [
-                //"--path", "model/unsup-PromptBERT-baseline/", "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
-                "--path", "model/unsup-simcse-bert-base-uncased/", "--task_set","transfer"
+                "--path", "model/unsup-PromptBERT-baseline/", "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
+                // "--path", "model/unsup-simcse-bert-base-uncased/", "--task_set","transfer"
             ],
             "justMyCode": false
         }
