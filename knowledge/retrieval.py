@@ -71,6 +71,10 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
     """
         查询知识
     """
+
+    type_list = ["title","summary","empty","sentence","rewrite","random"]
+    assert retrieve_type in type_list, f"retrieve_type must in {type_list}"
+
     result = []
     if retrieve_type=="title":
         knowledge_list = retrieval_knowledge_title(sent_list)
@@ -89,7 +93,21 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
     elif retrieve_type=="summary":
         return retrieval_knowledge_summary(sent_list,max_length)
     elif retrieve_type=="sentence":
-        return retrieval_knowledge_sentence(sent_list,max_length)
+        knowledge_list = retrieval_knowledge_sentence(sent_list,max_length)
+        sim_threshold = 0.7
+
+        for knowledge in knowledge_list:
+            if not knowledge:
+                result.append("")
+                continue
+            
+            k_sent_list = [sent for sim, sent in knowledge if sim > sim_threshold]
+            if not k_sent_list:
+                result.append("")
+                continue
+            k_sent_list = ",".join(k_sent_list)
+            result.append(k_sent_list)
+        return result
     elif retrieve_type=="empty":
         knowledge_list = retrieval_knowledge_title(sent_list)
         for k in knowledge_list:
