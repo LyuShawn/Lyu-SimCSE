@@ -16,154 +16,6 @@ from transformers.file_utils import (
 )
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
-class KnowledgeFussion(nn.Module):
-    def __init__(self, hidden_dim, model_args):
-        super(KnowledgeFussion, self).__init__()
-
-        self.model_args = model_args
-
-        self.attention = nn.MultiheadAttention(hidden_dim, 
-                                                num_heads=model_args.knowledge_attention_head_num, 
-                                                dropout=model_args.knowledge_attention_dropout)
-
-        if model_args.freeze_attention_strength:
-            self.attention_strength = model_args.knowledge_attention_strength
-        else:
-            self.attention_strength = nn.Parameter(torch.tensor(model_args.knowledge_attention_strength))
-
-
-    def forward(self, model_output, 
-                input_ids , 
-                knowledge_output, 
-                empyt_knowledge_mask,
-                knowledge_token_id,
-                mask_token_id):
-
-        # model_output: (bs, len, hidden)
-        # knowledge_output: (bs, hidden)
-        bs, sent_len, hidden_dim = model_output.shape
-
-        assert knowledge_output.shape == (bs, hidden_dim)
-
-        origin_output = model_output.clone()    # (bs, len, hidden)
-
-        knowledge_mask = input_ids == knowledge_token_id # (bs, len)
-        
-        knowledge_output = knowledge_output.unsqueeze(1).repeat(1, sent_len, 1) # (bs, len, hidden)
-        # 根据knowledge_mask，替换掉model_output中的知识部分
-        model_output[knowledge_mask] = knowledge_output[knowledge_mask]
-
-        q = model_output[input_ids == mask_token_id] # (bs, hidden)
-        # k = knowledge_output    # (bs, hidden)
-        # v = model_output   # (bs, len, hidden)
-
-        q = q.unsqueeze(1)  # (bs, 1, hidden)
-        # k = k.unsqueeze(1)  # (bs, 1, hidden)
-
-        k = model_output # (bs, len, hidden)
-        v = model_output # (bs, len, hidden)
-
-        q = q.transpose(0, 1)  # (1, bs, hidden)
-        k = k.transpose(0, 1)  # (len, bs, hidden)
-        v = v.transpose(0, 1)  # (len, bs, hidden)
-
-        # attn_output: (len, bs, hidden)
-        attn_output, attn_weights = self.attention(q, k, v)  # (len, bs, hidden)        
-
-        attn_output = attn_output.transpose(0, 1)  # (bs, len, hidden)
-
-        attn_output = attn_output.squeeze(1)  # (bs, hidden)
-
-        # 调整模型输出
-        mask_output = origin_output[input_ids == mask_token_id] # (bs, hidden)
-
-        origin_mask_output = mask_output.clone()
-        mask_output = mask_output + self.attention_strength * attn_output
-
-        # 如果没有知识的部分，直接保留原始的 model_output（无变化）
-        mask_output = torch.where(empyt_knowledge_mask.unsqueeze(-1), origin_mask_output, mask_output)
-
-        return mask_output  # (bs, hidden)
-
-        # # 计算注意力更新
-        # # 为了符合 multi-head attention 的输入要求，需要对模型输出进行转置
-        # model_output = model_output.transpose(0, 1)  # 变为 (len, bs, hidden)
-        
-        # # 注意力机制：进行 self-attention 更新
-        # attn_output, attn_weights = self.attention(model_output, model_output, model_output)  # (len, bs, hidden)
-        
-        # # # Step 3: 更新 model_output
-        # attn_output = attn_output.transpose(0, 1)  # 转回 (bs, len, hidden)
-        # model_output = model_output.transpose(0, 1)  # 转回 (bs, len, hidden)
-
-        # # 使用注意力权重来调整模型输出
-        # model_output = model_output + self.attention_strength * attn_output
-
-        # # 如果没有知识的部分，直接保留原始的 model_output（无变化）
-        # empyt_knowledge_mask = empyt_knowledge_mask.repeat(2) # (bs * len)
-        # model_output[empyt_knowledge_mask] = origin_output[empyt_knowledge_mask]
-        
-        return model_output[input_ids == mask_token_id] # (bs, hidden)
-
-class CrossAttentionLayer(nn.Module):
-    def __init__(self, hidden_dim, num_heads, dropout=0.1):
-        """
-        初始化交叉注意力机制层
-        :param hidden_dim: 特征维度 (BERT 隐藏层大小)
-        :param num_heads: 注意力头数
-        :param dropout: 注意力的dropout比率
-        """
-        super(CrossAttentionLayer, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.num_heads = num_heads
-        self.attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=num_heads, dropout=dropout)
-        self.layer_norm = nn.LayerNorm(hidden_dim)
-        self.ffn = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim)
-        )
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, sentence_output, knowledge_emb, empty_knowledge_mask):
-        """
-        前向传播
-        :param sentence_output: (bs, seq_len, hidden_dim) 句子的 BERT 表征
-        :param knowledge_emb: (bs, knowledge_num, hidden_dim) 句子相关的知识表征
-        :param empty_knowledge_mask: (bs,) 是否不更新句子表征的掩码
-        :return: (bs, seq_len, hidden_dim) 更新后的句子表征
-        """
-        bs, seq_len, hidden_dim = sentence_output.size()
-        knowledge_num = knowledge_emb.size(1)
-
-        # 转换维度以匹配 MultiheadAttention 的输入格式 (seq_len, bs, hidden_dim)
-        sentence_output = sentence_output.transpose(0, 1)  # (seq_len, bs, hidden_dim)
-        knowledge_emb = knowledge_emb.transpose(0, 1)      # (knowledge_num, bs, hidden_dim)
-
-        # Query = 句子表征, Key/Value = 知识表征
-        attn_output, _ = self.attention(query=sentence_output, key=knowledge_emb, value=knowledge_emb)
-
-        # 残差连接 + LayerNorm
-        sentence_output = self.layer_norm(sentence_output + self.dropout(attn_output))
-
-        # 前馈网络 + 残差连接 + LayerNorm
-        ffn_output = self.ffn(sentence_output)
-        updated_sentence_output = self.layer_norm(sentence_output + self.dropout(ffn_output))
-
-        # 转回原始形状 (bs, seq_len, hidden_dim)
-        updated_sentence_output = updated_sentence_output.transpose(0, 1)
-
-        # 使用 empty_knowledge_mask 进行选择性更新
-        # 如果 empty_knowledge_mask 为 True, 保持原始句子表征
-        updated_sentence_output = torch.where(
-            empty_knowledge_mask.unsqueeze(1).unsqueeze(2),  # (bs, 1, 1)
-            sentence_output.transpose(0, 1),  # 原始句子表征 (bs, seq_len, hidden_dim)
-            updated_sentence_output  # 更新后的表征
-        )
-
-        return updated_sentence_output
-
 class MLPLayer(nn.Module):
     """
     Head for getting sentence representations over RoBERTa/BERT's CLS representation.
@@ -269,6 +121,7 @@ def cl_init(cls, config):
     if cls.model_args.pooler_type == "cls":
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
+    cls.knowledge_sim = Similarity(temp=cls.model_args.knowledge_temp)
 
     cls.init_weights()
 
@@ -363,11 +216,6 @@ def cl_forward(cls,
                                     input_ids = sent_knowledge["input_ids"], 
                                     pooler_type = "mask",
                                     mask_token_id = cls.mask_token_id)
-        if cls.model_args.knowledge_loss_type == "l2":
-            # 计算L2正则化作为知识抑制损失
-            ksl = torch.mean(torch.norm(knowledge_output, p=2, dim=-1) ** 2) * cls.model_args.knowledge_loss_weight
-        else:
-            raise NotImplementedError
 
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
@@ -394,6 +242,12 @@ def cl_forward(cls,
         cos_sim = cos_sim + weights
 
     loss = loss_fct(cos_sim, labels)
+
+    if cls.model_args.knowledge_loss_type == "info_nce":
+        # 计算L2正则化作为知识抑制损失
+        k_sim = cls.knowledge_sim(z1.unsqueeze(1), z2.unsqueeze(0))
+        ksl = loss_fct(k_sim, labels)
+        loss = loss + cls.model_args.knowledge_loss_weight * ksl
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:

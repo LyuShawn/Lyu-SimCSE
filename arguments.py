@@ -184,38 +184,17 @@ class ModelArguments:
         }
     )
 
-    knowledge_loss_type: Literal["","l1","l2","energy_based","mse"] = field(
+    knowledge_loss_type: Literal["","l1","l2","energy_based","mse","info_nce"] = field(
         default="",
         metadata={
             "help": "The type of knowledge loss."
         }
     )
 
-    knowledge_attention_strength: float = field(
-        default=1.0,
+    knowledge_temp: float = field(
+        default=0.05,
         metadata={
-            "help": "The strength of knowledge attention."
-        }
-    )
-
-    knowledge_attention_head_num: int = field(
-        default=1,
-        metadata={
-            "help": "The number of knowledge attention heads."
-        }
-    )
-
-    freeze_attention_strength: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to freeze attention strength."
-        }
-    )
-
-    knowledge_attention_dropout: float = field(
-        default=0.0,
-        metadata={
-            "help": "The dropout of knowledge attention."
+            "help": "The temperature of knowledge fusion."
         }
     )
 
@@ -254,12 +233,6 @@ class ModelArguments:
         }
     )
 
-    cut_cls_token: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to cut cls token."
-        }
-    )
 
 
 @dataclass

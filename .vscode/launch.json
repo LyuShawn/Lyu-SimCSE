@@ -35,14 +35,13 @@
                 "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",
                 "--per_device_train_batch_size", "32",
                 "--eval_steps", "25",
-                // "--knowledge_hard_negative",
                 "--knowledge_fusion_type", "knowledge_positive",
                 // "--do_knowledge_fusion",
-                // "--knowledge_loss_type","l2",
-                // "--knowledge_loss_weight","1e-2",
+                "--knowledge_loss_type","info_nce",
+                "--knowledge_loss_weight","1e-2",
                 "--eval_template", "This sentence of '{sentence}' means [MASK].",
-                "--knowledge_retrieve_type", "title",
-                // "--hard_negative_weight", "0"
+                "--knowledge_retrieve_type", "sentence",
+                "--knowledge_temp", "0.05"
             ],
             "justMyCode": false
         },
