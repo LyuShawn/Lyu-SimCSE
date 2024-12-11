@@ -119,7 +119,8 @@ class ModelArguments:
 
     prompt_template: Optional[str] = field(
         # 'The phrase \'{sentence}\' may relate to [KNOWLEDGE], thus [MASK] is implied.',
-        default='This sentence : \'{sentence}\' means [MASK].',
+        # This sentence : \'{sentence}\' means [MASK].
+        default='',
         metadata={
             "help": "The prompt template."
         }
@@ -377,7 +378,7 @@ class OurTrainingArguments(TrainingArguments):
 
 
     save_total_limit: Optional[int] = field(
-        default=3,
+        default=5,
         metadata={"help": "Limit the total amount of checkpoints."}
     )
 

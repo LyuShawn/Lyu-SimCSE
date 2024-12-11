@@ -200,6 +200,10 @@ def main():
         model.eval_prefix_origin_input_ids = tokenizer.encode(model_args.eval_prefix, add_special_tokens=False)
         model.eval_suffix_origin_input_ids = tokenizer.encode(model_args.eval_suffix, add_special_tokens=False)
 
+        # logger
+        logger.info(f"*** Prompt Template : {model_args.prompt_template} ***")
+        logger.info(f"*** Eval Template : {model_args.eval_template} ***")
+
 
     prepare_features_args = PrepareFeaturesArgs(
         tokenizer=tokenizer,

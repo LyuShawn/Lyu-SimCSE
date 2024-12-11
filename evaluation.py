@@ -211,8 +211,11 @@ class EvaluationUtil:
             sentences = [" ".join(s) for s in batch]
 
             if model_args.do_prompt_enhancement and model_args.eval_template:
-                template = model_args.eval_template
-                sentences = [template.replace("{sentence}", s).replace("[MASK]", tokenizer.mask_token) for s in sentences]
+                template = model_args.eval_template.replace("[MASK]", tokenizer.mask_token)
+                for i, s in enumerate(sentences):
+                    if len(s) > 0 and s[-1] not in '.?"\'': s += '.'
+                    sentences[i] = template.replace("{sentence}", s).strip()
+                # sentences = [template.replace("{sentence}", s).replace("[MASK]", tokenizer.mask_token) for s in sentences]
 
             # Tokenization
 

@@ -108,6 +108,13 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
         sent_features['input_ids'] = input_ids
         sent_features['attention_mask'] = attention_mask
+        # 对齐
+        # sent_features['attention_mask'] = []
+        # ml = max([len(i) for i in sent_features['input_ids']])
+        # for i in range(len(sent_features['input_ids'])):
+        #     t = sent_features['input_ids'][i]
+        #     sent_features['input_ids'][i] = t + [tokenizer.pad_token_id]*(ml-len(t))
+        #     sent_features['attention_mask'].append(len(t)*[1] + (ml-len(t))*[0])
 
     else:
         sent_features = tokenizer(
