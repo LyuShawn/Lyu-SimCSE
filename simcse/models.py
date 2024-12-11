@@ -189,7 +189,7 @@ def cl_forward(cls,
         
     pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id)
 
-    assert pooler_output.shape == torch.Size([batch_size * num_sent, hidden_dim])  # 优雅的assert张量形状
+    assert pooler_output.shape == (batch_size * num_sent, hidden_dim)  # 优雅的assert张量形状
 
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
@@ -297,6 +297,7 @@ def sentemb_forward(
         mask = input_ids != cls.pad_token_id  # (batch_size, seq_len)
         non_pad_indices = mask.sum(dim=1)  # 每个句子的有效长度
 
+        # 都以pad填充
         new_input_ids = torch.full(
             (batch_size, seq_len + prompt_prefix.shape[0] + prompt_suffix.shape[0]),
             cls.pad_token_id,
@@ -306,8 +307,9 @@ def sentemb_forward(
         for i in range(batch_size):
             origin_sent = input_ids[i, :non_pad_indices[i]]  # 非 PAD 部分
             new_input = torch.cat([
-                prompt_prefix,           # CLS + 前缀
-                origin_sent[:-1],        # 原句内容（去掉最后一个 token）
+                origin_sent[0:1],        # CLS
+                prompt_prefix,           # 前缀
+                origin_sent[1:-1],       # 原句内容（去掉首尾）
                 prompt_suffix,           # 后缀
                 origin_sent[-1:]         # 最后一个 token
             ])

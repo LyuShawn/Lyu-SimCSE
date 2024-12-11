@@ -46,19 +46,11 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         prompt_prefix_input_ids = tokenizer.encode(model_args.prompt_prefix)[:-1]
         prompt_suffix_input_ids = tokenizer.encode(model_args.prompt_suffix)[1:]
 
-        if model_args.prompt_template2:
-            prompt_prefix_input_ids2 = model_args.prompt_prefix_input_ids2
-            prompt_suffix_input_ids2 = model_args.prompt_suffix_input_ids2
-        else:
-            prompt_prefix_input_ids2 = prompt_prefix_input_ids
-            prompt_suffix_input_ids2 = prompt_suffix_input_ids
-
         eval_template = model_args.eval_template
-        if eval_template:
-            eval_prefix = eval_template.split("{sentence}")[0]
-            eval_suffix = eval_template.split("{sentence}")[1]
-            eval_prefix_input_ids = tokenizer(eval_prefix)['input_ids'][:-1]
-            eval_suffix_input_ids = tokenizer(eval_suffix)['input_ids'][1:]
+        eval_prefix = eval_template.split("{sentence}")[0]
+        eval_suffix = eval_template.split("{sentence}")[1]
+        eval_prefix_input_ids = tokenizer.encode(eval_prefix)[:-1]
+        eval_suffix_input_ids = tokenizer.encode(eval_suffix)[1:]
 
         if knowledge_mark in model_args.prompt_template:
             knowledge_list = retrieval_knowledge(examples[sent0_cname], 
@@ -108,7 +100,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 if i < total:
                     input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
                 elif i < total*2:
-                    input_ids.append(prompt_prefix_input_ids2 + s + prompt_suffix_input_ids2)
+                    input_ids.append(eval_prefix_input_ids + s + eval_suffix_input_ids)
                 else:
                     raise NotImplementedError
 
