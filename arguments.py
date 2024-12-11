@@ -134,6 +134,19 @@ class ModelArguments:
         }
     )
 
+    random_prompt: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use random prompt."
+        }
+    )
+
+    knowledge_enhancement: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use knowledge enhancement."
+        }
+    )
 
     dropout: float = field(
         default=0.1,

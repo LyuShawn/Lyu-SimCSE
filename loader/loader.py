@@ -1,4 +1,5 @@
 from knowledge.retrieval import retrieval_knowledge
+from knowledge.prompt import get_random_prompt
 
 class PrepareFeaturesArgs:
     def __init__(self, tokenizer, data_args, model_args, sent0_cname, sent1_cname, sent2_cname):
@@ -31,8 +32,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
     sentences = examples[sent0_cname] + examples[sent1_cname]
 
-    knowledge_mark = "{knowledge}"
-
     # 如果有第三个句子
     if sent2_cname is not None:
         for idx in range(total):
@@ -52,10 +51,10 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         eval_prefix_input_ids = tokenizer.encode(eval_prefix)[:-1]
         eval_suffix_input_ids = tokenizer.encode(eval_suffix)[1:]
 
-        if knowledge_mark in model_args.prompt_template:
+        if model_args.knowledge_enhancement:
             knowledge_list = retrieval_knowledge(examples[sent0_cname], 
                                                 retrieve_type=args.model_args.knowledge_retrieve_type,
-                                                max_length=args.model_args.knowledge_max_length)
+                                                max_length=data_args.max_seq_length)
 
         input_ids = []
         attention_mask = []
@@ -67,12 +66,17 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                     truncation=True,
                     padding="max_length" if data_args.pad_to_max_length else False,)
 
-            if knowledge_mark in model_args.prompt_template:
+            if model_args.knowledge_enhancement:
+
+                if model_args.random_prompt:
+                    prompt_template = get_random_prompt()
+                    prompt_template = prompt_template.replace("[MASK]", tokenizer.mask_token)
+                else:
+                    prompt_template = model_args.prompt_template
+
                 knowledge = knowledge_list[i % total]
                 if knowledge:
-                    knowledge = knowledge.split()[0:data_args.max_seq_length]
-                    knowledge = " ".join(knowledge)
-                    template = model_args.prompt_template.replace(knowledge_mark, knowledge)
+                    template = prompt_template.format(knowledge=knowledge,sentence='{sentence}')
                 else:
                     template = model_args.eval_template
 

@@ -87,8 +87,8 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
             if max_length == -1:
                 result.append(knowledge)
             else:
-                knowledge = knowledge[0:max_length]
-                result.append(knowledge)
+                knowledge = knowledge.split()[0:max_length]
+                result.append(" ".join(knowledge))
         return result
     elif retrieve_type=="summary":
         return retrieval_knowledge_summary(sent_list,max_length)
