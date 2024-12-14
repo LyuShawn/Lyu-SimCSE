@@ -1,7 +1,7 @@
 from knowledge.backend import RedisClient
 from utils.sentence_util import text_encode
 import json
-
+from utils.cache_util import disk_cache
 
 def retrieval_knowledge_title(sent_list):
     redis_client = RedisClient()
@@ -67,6 +67,7 @@ def retrieval_knowledge_sentence(sent_list,max_length = -1):
                 result.append(value)
         return result
 
+@disk_cache
 def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
     """
         查询知识
