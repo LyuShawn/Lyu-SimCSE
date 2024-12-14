@@ -195,7 +195,7 @@ def cl_forward(cls,
 
     pooler_output = cls.mlp(pooler_output)
 
-    if cls.model_args.do_knowledge_fusion:
+    if sent_knowledge:
 
         # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
         if cls.knowledge_encoder is not None:
@@ -243,9 +243,16 @@ def cl_forward(cls,
 
     loss = loss_fct(cos_sim, labels)
 
-    if cls.model_args.knowledge_loss_type == "info_nce":
-        # 计算L2正则化作为知识抑制损失
-        k_sim = cls.knowledge_sim(z1.unsqueeze(1), z2.unsqueeze(0))
+    if cls.model_args.knowledge_loss_type:
+        if cls.model_args.knowledge_loss_type == "info_nce":
+            k_sim = cls.knowledge_sim(z1.unsqueeze(1), z2.unsqueeze(0))
+        elif cls.model_args.knowledge_loss_type == "k1_info_nce":
+            # 计算知识融合的损失
+            # 融合知识的原句子和纯知识表征做相似度计算
+            k_sim = cls.knowledge_sim(z1.unsqueeze(1), knowledge_output.unsqueeze(0))
+        elif cls.model_args.knowledge_loss_type == "k2_info_nce":
+            k_sim = cls.knowledge_sim(z2.unsqueeze(1), knowledge_output.unsqueeze(0))
+
         ksl = loss_fct(k_sim, labels)
         loss = loss + cls.model_args.knowledge_loss_weight * ksl
 
@@ -362,7 +369,7 @@ class BertForCL(BertPreTrainedModel):
         if self.model_args.do_mlm:
             self.lm_head = BertLMPredictionHead(config)
 
-        if self.model_args.do_knowledge_fusion:
+        if self.model_args.knowledge_loss_type in ["k1_info_nce","k2_info_nce"]:
             if self.model_args.knowledge_encoder:
                 self.knowledge_encoder = BertModel(config, add_pooling_layer=False)
             else:

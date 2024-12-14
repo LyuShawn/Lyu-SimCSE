@@ -31,7 +31,9 @@ class OurDataCollatorWithPadding:
             import random
             random.shuffle(features)
 
-        if self.model_args.do_knowledge_fusion:
+        has_sent_knowledge = features[0].get('sent_knowledge', None) is not None
+
+        if has_sent_knowledge:
             # 保存并移除sent_knowledge_intput_ids
             sent_knowledge_input_ids = [item.pop('sent_knowledge') for item in features]
             sent_knowledge_attention_mask = []
@@ -63,7 +65,7 @@ class OurDataCollatorWithPadding:
         attention_mask = torch.tensor(attention_mask, dtype=torch.long)
         batch = {"input_ids": input_ids, "attention_mask": attention_mask}
 
-        if self.model_args.do_knowledge_fusion:
+        if has_sent_knowledge:
             batch['sent_knowledge'] = {'input_ids': sent_knowledge_input_ids, 'attention_mask': sent_knowledge_attention_mask}
 
         if self.do_mlm:

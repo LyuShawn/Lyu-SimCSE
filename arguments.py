@@ -169,13 +169,6 @@ class ModelArguments:
         }
     )
 
-    do_knowledge_fusion: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use knowledge fusion."
-        }
-    )
-
     knowledge_fusion_type: Literal["","full","self_positive","knowledge_positive"] = field(
         default="",
         metadata={
@@ -190,7 +183,7 @@ class ModelArguments:
         }
     )
 
-    knowledge_loss_type: Literal["","l1","l2","energy_based","mse","info_nce"] = field(
+    knowledge_loss_type: Literal["","info_nce","k1_info_nce","k2_info_nce"] = field(
         default="",
         metadata={
             "help": "The type of knowledge loss."
