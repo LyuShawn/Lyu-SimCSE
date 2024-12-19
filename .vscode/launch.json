@@ -40,6 +40,7 @@
                 "--knowledge_loss_weight","1e-2",
                 "--eval_template", "This sentence of '{sentence}' means [MASK].",
                 "--knowledge_enhancement",
+                "--do_mlm",
                 // "--random_prompt",
                 // "--knowledge_retrieve_type", "sentence",
                 // "--knowledge_temp", "0.05"
