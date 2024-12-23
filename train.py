@@ -85,6 +85,7 @@ def main():
     if data_args.sample_data:
         # 只有train所以只对train进行采样
         datasets["train"] = datasets["train"].select(range(data_args.sample_data))
+        
 
     # 设置随机种子
     set_seed(training_args.seed)

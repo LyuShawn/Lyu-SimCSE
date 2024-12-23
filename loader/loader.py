@@ -39,6 +39,23 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 examples[sent2_cname][idx] = " "
         sentences += examples[sent2_cname]
 
+    if model_args.knowledge_hard_negative:
+        from knowledge.retrieval import retrieval_knowledge_sentence
+        import random
+        list = retrieval_knowledge_sentence(examples[sent0_cname])
+        num = len(examples[sent0_cname])
+        sent_list = []
+        for item in list:
+            if item:
+                sent_list+=[sent for cos_sim,sent in item if cos_sim > 0.5]
+        k_sent = random.sample(sent_list,min(num,len(sent_list)))
+
+        if len(k_sent) < num:
+            k_sent += ["N/A"]*(num-len(k_sent))
+
+        assert len(k_sent) == num
+        sentences += k_sent
+
     if model_args.do_prompt_enhancement:
         sent_features = {}
 

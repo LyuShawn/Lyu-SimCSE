@@ -52,6 +52,7 @@ def retrieval_knowledge_summary(sent_list,max_length = -1):
             result.append(" ".join(summary))
     return result
 
+@disk_cache
 def retrieval_knowledge_sentence(sent_list,max_length = -1):
         redis_client = RedisClient(db=2)
         prifix = "similarity_sent_"
@@ -95,7 +96,7 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         return retrieval_knowledge_summary(sent_list,max_length)
     elif retrieve_type=="sentence":
         knowledge_list = retrieval_knowledge_sentence(sent_list,max_length)
-        sim_threshold = 0.7
+        sim_threshold = 0.5
 
         for knowledge in knowledge_list:
             if not knowledge:
@@ -121,3 +122,5 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         return sent_list
     else:
         raise NotImplementedError
+
+
