@@ -50,7 +50,7 @@ def main():
     random.shuffle(sent_list)
 
     # 使用线程池进行并发请求
-    max_workers = 32  # 设置并发线程数量
+    max_workers = 16  # 设置并发线程数量
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(fuzzy_search_sent, sent, max_workers) for sent in sent_list]
         for future in tqdm(as_completed(futures), total=len(futures)):
