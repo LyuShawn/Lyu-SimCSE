@@ -1,4 +1,5 @@
 import redis
+import json
 
 class SingletonMeta(type):
     _instances = {}
@@ -37,4 +38,8 @@ class RedisClient(metaclass=SingletonMeta):
         return [value.decode() if value else None for value in values]
 
     def set(self, key, value, *args, **kwargs):
+
+        if isinstance(value, (dict, list, tuple)):
+            value = json.dumps(value)
+
         return self._connection.set(key, value, *args, **kwargs)
