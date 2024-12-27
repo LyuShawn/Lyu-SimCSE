@@ -1,8 +1,6 @@
 import diskcache as dc
 from knowledge.backend import RedisClient
 
-expire_time = 60 * 60 * 24 * 7  # 1 week
-
 # 创建磁盘缓存
 cache = dc.Cache('cache')
 
@@ -21,12 +19,11 @@ def disk_cache(func):
 def two_level_cache(func):
     """函数二级缓存装饰器"""
     def wrapper(*args, **kwargs):
-        cache_key = f"{func.__name__}:{args}:{kwargs}"
-
+        # 序列化参数
+        cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
         if cache_key in cache:
             # 文件缓存命中
             return cache[cache_key]
-
         try:
             # 文件缓存未命中，尝试Redis缓存
             redis_client = RedisClient()
@@ -34,7 +31,7 @@ def two_level_cache(func):
             if value:
                 result = value
                 # 二级缓存更新一级缓存
-                cache.set(cache_key, result, expire=expire_time)
+                cache.set(cache_key, result)
                 return result
         except Exception as e:
             # 异常说明没有Redis服务
@@ -42,9 +39,8 @@ def two_level_cache(func):
 
         # 二级缓存未命中，调用函数
         result = func(*args, **kwargs)
-
         # 更新二级缓存
-        cache.set(cache_key, result, expire=expire_time)
+        cache.set(cache_key, result)
         try:
             redis_client.set(cache_key, result)
         except Exception as e:
