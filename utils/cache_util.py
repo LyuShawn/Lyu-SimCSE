@@ -1,5 +1,6 @@
 import diskcache as dc
 from knowledge.backend import RedisClient
+import json
 
 # 创建磁盘缓存
 cache = dc.Cache('cache')
@@ -29,7 +30,7 @@ def two_level_cache(func):
             redis_client = RedisClient()
             value = redis_client.get(cache_key)
             if value:
-                result = value
+                result = json.loads(value)
                 # 二级缓存更新一级缓存
                 cache.set(cache_key, result)
                 return result

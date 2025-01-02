@@ -9,7 +9,7 @@ import requests
 from utils.cache_util import two_level_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-import json
+from knowledge.backend import RedisClient
 
 search_relative_topk = 50
 URL = "https://en.wikipedia.org/w/api.php"
@@ -35,11 +35,11 @@ def fuzzy_search_sent(sent, lang='en'):
     }
 
     response = request_wiki_api(params)
-    try:
-        search_results = response["query"]["search"]
-        return search_results
-    except Exception:
-        return None
+
+    if "query" not in response or "search" not in response["query"]:
+        return []
+    search_results = response["query"]["search"]
+    return search_results
 
 def page_info_retrieval(page_id, lang='en'):
     """检索页面详细信息"""
@@ -54,12 +54,11 @@ def page_info_retrieval(page_id, lang='en'):
     }
 
     response = request_wiki_api(params)
-    try:
-        page_info = response["query"]["pages"][str(page_id)]
-        return json.dumps(page_info, indent=4)
-    except Exception:
-        pass
+    if "query" not in response or "pages" not in response["query"] or str(page_id) not in response["query"]["pages"]:
         return {}
+
+    page_info = response["query"]["pages"][str(page_id)]
+    return page_info
 
 def main():
     max_workers = 8  # 设置并发线程数量
@@ -67,21 +66,31 @@ def main():
     with open(input_file, 'r', encoding='utf-8') as f:
         sent_list = f.read().splitlines()
 
-    random.shuffle(sent_list)
+    redis_client = RedisClient()
+    
+    # sent_list = sent_list[:1000]
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(fuzzy_search_sent, sent) for sent in sent_list]
-        for future in tqdm(as_completed(futures), total=len(futures)):
-            future.result()
+    # random.shuffle(sent_list)
 
-    page_id_list = []
-    for sent in tqdm(sent_list):
-        search_results = fuzzy_search_sent(sent)
-        if search_results:
-            page_id_list+=[result['pageid'] for result in search_results]    
-    # 去重
-    page_id_list = list(set(page_id_list))
+    page_id_key = "wiki1m_page_id_list"
+    page_id_list = redis_client.get(page_id_key)
+    if not page_id_list:
+        page_id_list = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(fuzzy_search_sent, sent) for sent in sent_list]
+            for future in tqdm(as_completed(futures), total=len(futures), desc="Searching"):
+                search_results = future.result()
+                if search_results:
+                    page_id_list+=[result['pageid'] for result in search_results]
 
+        # 去重
+        page_id_list = list(set(page_id_list))
+    
+        redis_client.set(page_id_key, page_id_list)
+
+    print(f"Total {len(page_id_list)} pages found!")
+
+    # page_id_list = page_id_list[:100]
     random.shuffle(page_id_list)
 
     # 使用线程池进行并发请求

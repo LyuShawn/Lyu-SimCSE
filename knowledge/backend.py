@@ -31,6 +31,7 @@ class RedisClient(metaclass=SingletonMeta):
         value = self._connection.get(key, *args, **kwargs)
         return value.decode() if value else None
 
+
     def mget(self, keys, *args, **kwargs):
         if not isinstance(keys, (list, tuple)):
             raise TypeError("keys must be a list or tuple")
