@@ -10,6 +10,7 @@ from utils.cache_util import two_level_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from knowledge.backend import RedisClient
+import json
 
 search_relative_topk = 50
 URL = "https://en.wikipedia.org/w/api.php"
@@ -87,6 +88,8 @@ def main():
         page_id_list = list(set(page_id_list))
     
         redis_client.set(page_id_key, page_id_list)
+    else:
+        page_id_list = json.loads(page_id_list)
 
     print(f"Total {len(page_id_list)} pages found!")
 
