@@ -1,6 +1,7 @@
 import amrlib
 from tqdm import tqdm
 import argparse
+import torch
 
 def main(args):
     input_file = args.input_file
@@ -27,6 +28,9 @@ def main(args):
         sents = gtos.generate(graphs)
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write('\n'.join(sents[0]) + '\n')
+        # 清理显存
+        del graphs
+        del sents
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
