@@ -2,11 +2,15 @@ import amrlib
 from tqdm import tqdm
 import argparse
 import torch
+import os
 
 def main(args):
     input_file = args.input_file
     output_file = args.output_file
     bs = args.bs
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
 
     print(f"Loading sents...")
     with open(input_file, 'r', encoding='utf-8') as f:
@@ -26,7 +30,7 @@ def main(args):
         list = sent_list[i:i+bs]
         graphs = stog.parse_sents(list)
         sents = gtos.generate(graphs)
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, 'a', encoding='utf-8') as f:
             f.write('\n'.join(sents[0]) + '\n')
         # 清理显存
         del graphs
