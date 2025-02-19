@@ -13,10 +13,13 @@ def main(args):
 
     print(f"Loading models...")
     stog = amrlib.load_stog_model(args.stog_model)
+    stog.max_sent_len = 64
+    stog.max_graph_len = 256
     stog.batch_size = bs
     gtos = amrlib.load_gtos_model("model/model_generate_t5wtense-v0_1_0")
     gtos.batch_size = bs
-
+    gtos.max_sent_len = 64
+    gtos.max_graph_len = 256
     print(f"Generating AMRs...")
     for i in tqdm(range(0, len(sent_list), bs)):
         list = sent_list[i:i+bs]
