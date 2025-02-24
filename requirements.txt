@@ -16,3 +16,7 @@ wandb
 redis
 diskcache
 amrlib
+
+wikipedia-api
+nltk
+pymysql

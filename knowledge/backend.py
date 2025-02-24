@@ -1,5 +1,6 @@
 import redis
 import json
+import pymysql
 
 class SingletonMeta(type):
     _instances = {}
@@ -44,3 +45,79 @@ class RedisClient(metaclass=SingletonMeta):
             value = json.dumps(value)
 
         return self._connection.set(key, value, *args, **kwargs)
+
+    def mset(self, key_value_dict, *args, **kwargs):
+        """
+        批量设置多个键值对，支持 JSON 数据
+        """
+        if not isinstance(key_value_dict, dict):
+            raise TypeError("key_value_dict must be a dictionary")
+
+        # 将所有值转换为 JSON 字符串
+        for key, value in key_value_dict.items():
+            if isinstance(value, (dict, list, tuple)):
+                key_value_dict[key] = json.dumps(value)
+
+        # 批量设置键值对
+        return self._connection.mset(key_value_dict)
+
+    def check_keys_exist(self, keylist, *args, **kwargs):
+        if not isinstance(keylist, (list, tuple)):
+            raise TypeError("keylist must be a list or tuple")
+
+        # 使用 exists 方法逐个检查键是否存在
+        existing_keys = [key for key in keylist if self._connection.exists(key)]
+        non_existing_keys = [key for key in keylist if not self._connection.exists(key)]
+
+        return existing_keys, non_existing_keys
+
+class MySQLClient(metaclass=SingletonMeta):
+
+    def __init__(self):
+        self.connection = pymysql.connect(
+            host="59.77.134.205",
+            user="root",
+            password="lyumysql579",
+            database="wiki"
+        )
+
+    def batch_set_wiki_page_content(self, page_content_dict, keyword):
+        """批量添加维基页面内容"""
+        cursor = self.connection.cursor()
+        sql = """
+            INSERT INTO t_page_content (id, content, keyword)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE id = id;
+            """
+        cursor.executemany(sql, [(page_id, page_content, keyword) for page_id, page_content in page_content_dict.items()])
+        self.connection.commit()
+        cursor.close()
+
+    def batch_get_wiki_page_content(self, page_id_list):
+        """批量获取维基页面内容"""
+        if not page_id_list:
+            return {}
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT id, content FROM t_page_content WHERE id IN %s;
+            """
+        cursor.execute(sql, (page_id_list,))
+        page_content_dict = {row[0]: row[1] for row in cursor.fetchall()}
+        cursor.close()
+        return page_content_dict
+
+    def batch_page_content_id_exist(self, page_id_list):
+        """批量检查维基页面内容是否存在
+        返回存在的keylist和不存在的keylist
+        """
+        if not page_id_list:
+            return [], []
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT id FROM t_page_content WHERE id IN %s;
+            """
+        cursor.execute(sql, (page_id_list,))
+        existing_keys = [row[0] for row in cursor.fetchall()]
+        non_existing_keys = list(set(page_id_list) - set(existing_keys))
+        cursor.close()
+        return existing_keys, non_existing_keys
