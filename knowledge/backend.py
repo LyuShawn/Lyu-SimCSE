@@ -72,7 +72,9 @@ class RedisClient(metaclass=SingletonMeta):
         return existing_keys, non_existing_keys
 
 class MySQLClient(metaclass=SingletonMeta):
-
+    """MySQL 客户端
+    封装对 MySQL 数据库的操作，可以直接存取数据
+    """
     def __init__(self):
         self.connection = pymysql.connect(
             host="59.77.134.205",
@@ -81,15 +83,15 @@ class MySQLClient(metaclass=SingletonMeta):
             database="wiki"
         )
 
-    def batch_set_wiki_page_content(self, page_content_dict, keyword):
+    def batch_set_wiki_page_content(self, page_content_dict, keyword,domain):
         """批量添加维基页面内容"""
         cursor = self.connection.cursor()
         sql = """
-            INSERT INTO t_page_content (id, content, keyword)
-            VALUES (%s, %s, %s)
+            INSERT INTO t_page_content (id, content, keyword, domain)
+            VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE id = id;
             """
-        cursor.executemany(sql, [(page_id, page_content, keyword) for page_id, page_content in page_content_dict.items()])
+        cursor.executemany(sql, [(page_id, page_content, keyword, domain) for page_id, page_content in page_content_dict.items()])
         self.connection.commit()
         cursor.close()
 

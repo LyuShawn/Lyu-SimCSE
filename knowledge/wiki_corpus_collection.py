@@ -45,12 +45,12 @@ def search_page(keyword, offset=0):
             raise Exception(f"Failed to fetch api with error code: {response.status_code}")
         data = response.json()
         total_hits = data['query']['searchinfo']['totalhits']
+        next_offset = data['continue']['sroffset'] if 'continue' in data else None
         page_id_list = [page['pageid'] for page in data['query']['search']]
-        return total_hits, page_id_list
+        return total_hits, page_id_list,next_offset
     except Exception as e:
         print(e)
-        return 0, []
-# '{"error":{"code":"cirrussearch-offset-too-large","info":"Could not retrieve results. Up to 10000 search results are supported, but results starting at 43500 were requested.","*":"See https://en.wikipedia.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/postorius/lists/mediawiki-api-announce.lists.wikimedia.org/&gt; for notice of API deprecations and breaking changes."},"servedby":"mw-api-ext.codfw.main-6f65bf8cbc-7jfsq"}'
+        return 0, [], 1
 
 def parse_wiki_text(wiki_text):
     """处理wikitext形式的文本"""
@@ -110,57 +110,86 @@ def get_page_info(page_id_list):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--keyword", type=str, default="biomedical")
+    parser.add_argument("--keyword", type=str, default="Medicine")
+    parser.add_argument("--domain", type=str, default="Medicine")
 
     args = parser.parse_args()
 
     keyword = args.keyword
+    domain = args.domain
 
-    sent_collect_num = 1_000_000
-    # 句子获取倍数
-    sent_multiple = 3
-    max_sent_num = sent_collect_num * sent_multiple
-    output_file = f"data/{keyword}_wiki1m.txt"
-
-    sent_list = []
     offset = 0
-    pbar = tqdm(total=max_sent_num,desc="collecting sentences")
-    while len(sent_list) < max_sent_num:
-        total_hits, page_id_list = search_page(keyword, offset)
-        offset += LIMIT
-        if offset > total_hits:
+    pbar = tqdm(total=100000,desc="collecting sentences")
+    while True:
+        total_hits, page_id_list, next_offset = search_page(keyword, offset)
+        pbar.total = total_hits
+        if not next_offset:
             break
+        offset = next_offset
 
         exist_keys, non_exist_keys = MySQL.batch_page_content_id_exist(page_id_list)
-
-        sent_list_tmp = []
-
-        # 存在的keys
-        page_info_dict = MySQL.batch_get_wiki_page_content(exist_keys)
-        for page_id, page_info in page_info_dict.items():
-            sent_list_tmp += sent_tokenize(page_info)
-            pbar.set_description(f"total:{total_hits} collecting from mysql")
 
         # 不存在的keys按50一组划分
         for i in range(0, len(non_exist_keys), 50):
             page_info_dict, used_time = get_page_info(non_exist_keys[i:i+50])
-            MySQL.batch_set_wiki_page_content(page_info_dict, keyword)
-            for page_id, page_content in page_info_dict.items():
-                sent_list_tmp += sent_tokenize(page_content)
+            MySQL.batch_set_wiki_page_content(page_info_dict, keyword, domain)
             pbar.set_description(f"total:{total_hits} collecting from wiki: {used_time:.2f}s")
+        pbar.update(len(page_id_list))
 
-        # 这里过滤句子
-        # TODO
-        sent_list += sent_list_tmp
-        pbar.update(len(sent_list_tmp))
 
-    # 采样
-    if len(sent_list) > sent_collect_num:
-        sent_list = random.sample(sent_list, sent_collect_num)
+# def main():
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--keyword", type=str, default="biomedical")
 
-    with open(output_file, 'w') as f:
-        for sent in sent_list:
-            f.write(sent + "\n")
+#     args = parser.parse_args()
+
+#     keyword = args.keyword
+
+#     sent_collect_num = 1_000_000
+#     # 句子获取倍数
+#     sent_multiple = 3
+#     max_sent_num = sent_collect_num * sent_multiple
+#     output_file = f"data/{keyword}_wiki1m.txt"
+
+#     sent_list = []
+#     offset = 0
+#     pbar = tqdm(total=max_sent_num,desc="collecting sentences")
+#     while len(sent_list) < max_sent_num:
+#         total_hits, page_id_list = search_page(keyword, offset)
+#         offset += LIMIT
+#         if offset > total_hits:
+#             break
+
+#         exist_keys, non_exist_keys = MySQL.batch_page_content_id_exist(page_id_list)
+
+#         sent_list_tmp = []
+
+#         # 存在的keys
+#         page_info_dict = MySQL.batch_get_wiki_page_content(exist_keys)
+#         for page_id, page_info in page_info_dict.items():
+#             sent_list_tmp += sent_tokenize(page_info)
+#             pbar.set_description(f"total:{total_hits} collecting from mysql")
+
+#         # 不存在的keys按50一组划分
+#         for i in range(0, len(non_exist_keys), 50):
+#             page_info_dict, used_time = get_page_info(non_exist_keys[i:i+50])
+#             MySQL.batch_set_wiki_page_content(page_info_dict, keyword)
+#             for page_id, page_content in page_info_dict.items():
+#                 sent_list_tmp += sent_tokenize(page_content)
+#             pbar.set_description(f"total:{total_hits} collecting from wiki: {used_time:.2f}s")
+
+#         # 这里过滤句子
+#         # TODO
+#         sent_list += sent_list_tmp
+#         pbar.update(len(sent_list_tmp))
+
+#     # 采样
+#     if len(sent_list) > sent_collect_num:
+#         sent_list = random.sample(sent_list, sent_collect_num)
+
+#     with open(output_file, 'w') as f:
+#         for sent in sent_list:
+#             f.write(sent + "\n")
 
 
 if __name__ == '__main__':
