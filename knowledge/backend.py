@@ -123,3 +123,14 @@ class MySQLClient(metaclass=SingletonMeta):
         non_existing_keys = list(set(page_id_list) - set(existing_keys))
         cursor.close()
         return existing_keys, non_existing_keys
+
+    def get_wiki_page_content(self, domain, offset=0, limit=1000):
+        """获取维基页面内容"""
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT id, content FROM t_page_content WHERE domain = %s LIMIT %s, %s;
+            """
+        cursor.execute(sql, (domain, offset, limit))
+        page_content_dict = {row[0]: row[1] for row in cursor.fetchall()}
+        cursor.close()
+        return page_content_dict

@@ -2,9 +2,7 @@ import requests
 import random
 import mwparserfromhell
 import re
-from backend import RedisClient, MySQLClient
-import nltk
-from nltk.tokenize import sent_tokenize
+from backend import MySQLClient
 from tqdm import tqdm
 import json
 import argparse
@@ -14,7 +12,6 @@ WIKI_API = "https://en.wikipedia.org/w/api.php"
 LIMIT = 500
 USER_AGENT = "SentenceFromWiki (lyushawn@foxmail.com)"
 header = { 'User-Agent': USER_AGENT }
-nltk.download('punkt')
 
 # r = RedisClient(db=3)   # 使用第3个数据库存储页面信息
 MySQL = MySQLClient()
