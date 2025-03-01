@@ -6,7 +6,6 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 import random
 import requests
-from utils.cache_util import two_level_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from knowledge.backend import RedisClient
@@ -15,7 +14,7 @@ import json
 search_relative_topk = 50
 URL = "https://en.wikipedia.org/w/api.php"
 
-@two_level_cache
+
 def request_wiki_api(params):
     response = requests.get(URL, params=params)
     response.raise_for_status()

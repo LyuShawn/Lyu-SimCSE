@@ -15,14 +15,11 @@ class SingletonMeta(type):
 
 class RedisClient(metaclass=SingletonMeta):
 
-    password = 'lyuredis579'
-
     def __init__(self, host='59.77.134.205', port=6379, db=0):
         self._connection = redis.StrictRedis(
             host=host,
             port=port,
             db=db,
-            password=self.password
         )
         
     def get_connection(self):
@@ -134,3 +131,35 @@ class MySQLClient(metaclass=SingletonMeta):
         page_content_dict = {row[0]: row[1] for row in cursor.fetchall()}
         cursor.close()
         return page_content_dict
+
+    def insert_sent_page_in(self,sent, sent_base64, title, page_id, size, word_count, snippet):
+
+        """插入sent和page相关的信息"""
+        cursor = self.connection.cursor()
+        sql = """
+            INSERT INTO t_sent_page_in (sent, sent_base64, title, page_id, size, word_count, snippet)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE sent = sent;
+            """
+        cursor.execute(sql, (sent, sent_base64, title, page_id, size, word_count, snippet))
+        self.connection.commit()
+        cursor.close()
+
+    def batch_insert_sent_page_in(self, sent_page_in_list):
+        """批量插入sent和page相关的信息"""
+        if not sent_page_in_list:
+            return
+
+        # 如果每个元素是dict而不是tuple，需要转换为tuple
+        if isinstance(sent_page_in_list[0], dict):
+            sent_page_in_list = [(item['sent'], item['sent_md5'], item['title'], item['page_id'], item['size'], item['word_count'], item['snippet']) for item in sent_page_in_list]
+
+        cursor = self.connection.cursor()
+        sql = """
+            INSERT INTO t_sent_page_in (sent, sent_md5, title, page_id, size, word_count, snippet)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE sent = sent;
+            """
+        cursor.executemany(sql, sent_page_in_list)
+        self.connection.commit()
+        cursor.close()
