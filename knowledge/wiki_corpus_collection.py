@@ -8,25 +8,15 @@ import json
 import argparse
 import time
 
-WIKI_API = "https://en.wikipedia.org/w/api.php"
+WIKI_API = "https://{lang}.wikipedia.org/w/api.php"
 LIMIT = 500
 USER_AGENT = "SentenceFromWiki (lyushawn@foxmail.com)"
 header = { 'User-Agent': USER_AGENT }
+LANG_LIST = ['de', 'en', 'es', 'fr', 'it', 'nl', 'pl', 'pt', 'ru', 'zh']
 
-# r = RedisClient(db=3)   # 使用第3个数据库存储页面信息
 MySQL = MySQLClient()
 
-# 获取关键词对应的页面URL
-params_base = {
-    'action': 'query',
-    'list': 'search',
-    'srsearch': "biomedical",
-    'format': 'json',
-    'srlimit': LIMIT,  # 设置每次请求获取的最大页面数
-    'sroffset': 0,
-}
-
-def search_page(keyword, offset=0):
+def search_page(keyword, offset=0,lang='en'):
     """根据keyword搜索，返回page_id_list"""
     params = {
         'action': 'query',
@@ -37,7 +27,7 @@ def search_page(keyword, offset=0):
         'sroffset': offset,
     }
     try:
-        response = requests.get(WIKI_API, params=params, headers=header)
+        response = requests.get(WIKI_API.format(lang=lang), params=params, headers=header)
         if response.status_code != 200:
             raise Exception(f"Failed to fetch api with error code: {response.status_code}")
         data = response.json()
@@ -66,9 +56,13 @@ def parse_wiki_text(wiki_text):
 
     # 去除多余的空格
     plain_text = re.sub(r'\s+', ' ', pain_text).strip()  # 将多个空白字符合并为一个空格
+
+    # 移除空的括号
+    plain_text = re.sub(r'([（(])[\s，,。！？；：“”‘’()、]*([）)])', '', plain_text)
+
     return plain_text
 
-def get_page_info(page_id_list):
+def get_page_info(page_id_list, lang='en'):
     """获取页面详细信息"""
     if len(page_id_list) > 50:
         raise Exception("The number of page ids exceeds the limit of 50.")
@@ -87,7 +81,7 @@ def get_page_info(page_id_list):
     try:
         start_time = time.time()
 
-        response = requests.get(WIKI_API, params=params, headers=header)
+        response = requests.get(WIKI_API.format(lang=lang), params=params, headers=header)
         if response.status_code != 200:
             raise Exception(f"Failed to fetch api with error code: {response.status_code}")
         data = response.json()
@@ -106,88 +100,53 @@ def get_page_info(page_id_list):
         return {}, 0
 
 def main():
+    # 适配领域语料收集和语言语料收集
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--keyword", type=str, default="Medicine")
-    parser.add_argument("--domain", type=str, default="Medicine")
+    parser.add_argument("--keyword", type=str, default="News")
+    parser.add_argument("--domain", type=str, default="News")
+    parser.add_argument("--lang", type=str, default="en")
+    parser.add_argument("--collect_lang", action="store_true")
 
     args = parser.parse_args()
 
     keyword = args.keyword
     domain = args.domain
+    lang = args.lang
+    collect_lang = args.collect_lang
+
+    assert lang in LANG_LIST, f"lang should be one of {LANG_LIST}"
 
     offset = 0
-    pbar = tqdm(total=100000,desc="collecting sentences")
+    pbar = tqdm(total=10000,desc="collecting sentences")
     while True:
-        total_hits, page_id_list, next_offset = search_page(keyword, offset)
+        total_hits, page_id_list, next_offset = search_page(keyword, offset, lang)
         pbar.total = total_hits
         if not next_offset:
             break
         offset = next_offset
 
-        exist_keys, non_exist_keys = MySQL.batch_page_content_id_exist(page_id_list)
+        if collect_lang:
+            exist_keys, non_exist_keys = MySQL.batch_page_content_id_exist_multilingual(page_id_list, lang)
+        else:
+            exist_keys, non_exist_keys = MySQL.batch_page_content_id_exist(page_id_list)
 
         # 不存在的keys按50一组划分
         for i in range(0, len(non_exist_keys), 50):
-            page_info_dict, used_time = get_page_info(non_exist_keys[i:i+50])
-            MySQL.batch_set_wiki_page_content(page_info_dict, keyword, domain)
+            page_info_dict, used_time = get_page_info(non_exist_keys[i:i+50], lang)
+
+            if collect_lang:
+                MySQL.batch_set_wiki_page_content_multilingual(page_info_dict, keyword, lang)
+            else:
+                MySQL.batch_set_wiki_page_content(page_info_dict, keyword, domain)
             pbar.set_description(f"total:{total_hits} collecting from wiki: {used_time:.2f}s")
         pbar.update(len(page_id_list))
 
 
-# def main():
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--keyword", type=str, default="biomedical")
-
-#     args = parser.parse_args()
-
-#     keyword = args.keyword
-
-#     sent_collect_num = 1_000_000
-#     # 句子获取倍数
-#     sent_multiple = 3
-#     max_sent_num = sent_collect_num * sent_multiple
-#     output_file = f"data/{keyword}_wiki1m.txt"
-
-#     sent_list = []
-#     offset = 0
-#     pbar = tqdm(total=max_sent_num,desc="collecting sentences")
-#     while len(sent_list) < max_sent_num:
-#         total_hits, page_id_list = search_page(keyword, offset)
-#         offset += LIMIT
-#         if offset > total_hits:
-#             break
-
-#         exist_keys, non_exist_keys = MySQL.batch_page_content_id_exist(page_id_list)
-
-#         sent_list_tmp = []
-
-#         # 存在的keys
-#         page_info_dict = MySQL.batch_get_wiki_page_content(exist_keys)
-#         for page_id, page_info in page_info_dict.items():
-#             sent_list_tmp += sent_tokenize(page_info)
-#             pbar.set_description(f"total:{total_hits} collecting from mysql")
-
-#         # 不存在的keys按50一组划分
-#         for i in range(0, len(non_exist_keys), 50):
-#             page_info_dict, used_time = get_page_info(non_exist_keys[i:i+50])
-#             MySQL.batch_set_wiki_page_content(page_info_dict, keyword)
-#             for page_id, page_content in page_info_dict.items():
-#                 sent_list_tmp += sent_tokenize(page_content)
-#             pbar.set_description(f"total:{total_hits} collecting from wiki: {used_time:.2f}s")
-
-#         # 这里过滤句子
-#         # TODO
-#         sent_list += sent_list_tmp
-#         pbar.update(len(sent_list_tmp))
-
-#     # 采样
-#     if len(sent_list) > sent_collect_num:
-#         sent_list = random.sample(sent_list, sent_collect_num)
-
-#     with open(output_file, 'w') as f:
-#         for sent in sent_list:
-#             f.write(sent + "\n")
-
-
 if __name__ == '__main__':
     main()
+
+""" 
+
+
+"""

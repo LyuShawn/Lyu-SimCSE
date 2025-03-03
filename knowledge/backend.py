@@ -163,3 +163,44 @@ class MySQLClient(metaclass=SingletonMeta):
         cursor.executemany(sql, sent_page_in_list)
         self.connection.commit()
         cursor.close()
+
+    def batch_set_wiki_page_content_multilingual(self, page_content_dict, keyword, lang):
+        """批量添加维基页面内容，多语言版本"""
+        cursor = self.connection.cursor()
+        sql = """
+            INSERT INTO t_page_content_multilingual (page_id, content, keyword, lang)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE page_id = page_id;
+            """
+        cursor.executemany(sql, [(page_id, page_content, keyword, lang) for page_id, page_content in page_content_dict.items()])
+        self.connection.commit()
+        cursor.close()
+
+    def batch_get_wiki_page_content_multilingual(self, page_id_list, lang):
+        """批量获取维基页面内容"""
+        if not page_id_list:
+            return {}
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT id, content FROM t_page_content_multilingual WHERE id IN %s AND lang = %s;
+            """
+        cursor.execute(sql, (page_id_list,lang))
+        page_content_dict = {row[0]: row[1] for row in cursor.fetchall()}
+        cursor.close()
+        return page_content_dict
+
+    def batch_page_content_id_exist_multilingual(self, page_id_list, lang):
+        """批量检查维基页面内容是否存在
+        返回存在的keylist和不存在的keylist
+        """
+        if not page_id_list:
+            return [], []
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT id FROM t_page_content_multilingual WHERE id IN %s AND lang = %s;
+            """
+        cursor.execute(sql, (page_id_list, lang))
+        existing_keys = [row[0] for row in cursor.fetchall()]
+        non_existing_keys = list(set(page_id_list) - set(existing_keys))
+        cursor.close()
+        return existing_keys, non_existing_keys
