@@ -284,7 +284,7 @@ class DataTrainingArguments:
 
     # SimCSE's arguments
     train_file: Optional[str] = field(
-        default='data/wiki1m_for_simcse.txt', 
+        default='wiki1m_for_simcse.txt', 
         metadata={"help": "The training data file (.txt or .csv)."}
     )
     max_seq_length: Optional[int] = field(

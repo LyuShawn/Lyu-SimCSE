@@ -64,13 +64,16 @@ def main():
     data_files = {}
     if data_args.train_file is not None:
         data_files["train"] = data_args.train_file
-    extension = data_args.train_file.split(".")[-1]
-    if extension == "txt":
-        extension = "text"
-    if extension == "csv":
-        datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/", delimiter="\t" if "tsv" in data_args.train_file else ",")
-    else:
-        datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/")
+    # 都是txt，所以从网络直接加载
+    HF_DATASET_NAME = "LyuShawn/Dataset-LyuCSE"
+    datasets = load_dataset(HF_DATASET_NAME, data_files=data_files, num_proc=4)
+    # extension = data_args.train_file.split(".")[-1]
+    # if extension == "txt":
+    #     extension = "text"
+    # if extension == "csv":
+    #     datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/", delimiter="\t" if "tsv" in data_args.train_file else ",")
+    # else:
+    #     datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/")
 
     if data_args.set_seed_before_shuffle:
         # 在shuffle之前设置随机种子，可以保证每次shuffle的结果一样
