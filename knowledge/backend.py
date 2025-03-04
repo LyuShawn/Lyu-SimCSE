@@ -204,3 +204,26 @@ class MySQLClient(metaclass=SingletonMeta):
         non_existing_keys = list(set(page_id_list) - set(existing_keys))
         cursor.close()
         return existing_keys, non_existing_keys
+
+    def get_wiki_page_content_multilingual(self, lang, offset=0, limit=1000):
+        """获取维基页面内容"""
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT id, content FROM t_page_content_multilingual WHERE lang = %s LIMIT %s, %s;
+            """
+        cursor.execute(sql, (lang, offset, limit))
+        page_content_dict = {row[0]: row[1] for row in cursor.fetchall()}
+        cursor.close()
+        return page_content_dict
+
+    def get_wiki_page_content_multilingual_len(self, lang):
+        """获取维基页面内容"""
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT count(id) FROM t_page_content_multilingual WHERE lang = %s;
+            """
+        cursor.execute(sql, (lang))
+        page_content_len = cursor.fetchall()
+        page_content_len = page_content_len[0][0]
+        cursor.close()
+        return page_content_len
