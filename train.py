@@ -66,14 +66,7 @@ def main():
         data_files["train"] = data_args.train_file
     # 都是txt，所以从网络直接加载
     HF_DATASET_NAME = "LyuShawn/Dataset-LyuCSE"
-    datasets = load_dataset(HF_DATASET_NAME, data_files=data_files, num_proc=4)
-    # extension = data_args.train_file.split(".")[-1]
-    # if extension == "txt":
-    #     extension = "text"
-    # if extension == "csv":
-    #     datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/", delimiter="\t" if "tsv" in data_args.train_file else ",")
-    # else:
-    #     datasets = load_dataset(extension, data_files=data_files, cache_dir="./data/cache/")
+    datasets = load_dataset(HF_DATASET_NAME, data_files=data_files)
 
     if data_args.set_seed_before_shuffle:
         # 在shuffle之前设置随机种子，可以保证每次shuffle的结果一样
@@ -232,12 +225,19 @@ def main():
         # 否则使用自定义的collator，传入tokenizer
         data_collator = OurDataCollatorWithPadding(tokenizer=tokenizer, mlm_probability=data_args.mlm_probability, do_mlm=model_args.do_mlm, model_args=model_args)
 
+    if training_args.eval_dataset is not None:
+        logger.info(f"********* Prepare Eval Dataset : {training_args.eval_dataset} *********")
+        eval_dataset = load_dataset(training_args.eval_dataset, name = training_args.eval_dataset_name)
+    else:
+        eval_dataset = None
+
     trainer = CLTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
+        eval_dataset=eval_dataset,
     )
     trainer.model_args = model_args
 
@@ -267,7 +267,7 @@ def main():
     if training_args.do_eval:
 
         logger.info(f"*** Evaluate ***")
-        eval_util = EvaluationUtil(path = training_args.output_dir, model_args = model_args, print_table=True)
+        eval_util = EvaluationUtil(path = training_args.output_dir, model_args = model_args, print_table=True, dataset=eval_dataset, dataset_name=training_args.eval_dataset)
         results, result_file_path = eval_util.eval()
         wandb.log(results)
         wandb.log({"score_file": wandb.save(result_file_path)})

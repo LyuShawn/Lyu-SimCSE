@@ -13,13 +13,30 @@ class CLTrainer(Trainer):
         eval_senteval_transfer: bool = False,
     ) -> Dict[str, float]:
 
+        self.model.eval()
+
+        if self.eval_dataset is not None:
+            # 使用传入的eval_dataset
+            dataset_name = self.args.eval_dataset
+            metrics = EvaluationUtil.eval_by_dataset(
+                model=self.model,
+                tokenizer=self.tokenizer,
+                dataset = self.eval_dataset,
+                dataset_name=dataset_name,
+                mode = "dev",
+            )
+
+            self.log(metrics)
+
+            return metrics
+
+
         params = EvaluationUtil.prepare_params(kfold=5, optim="rmsprop", batch_size=128, tenacity=3, epoch_size=2)
 
         tasks = EvaluationUtil.dev_sts_task_list
         if eval_senteval_transfer or self.args.eval_transfer:
             tasks += EvaluationUtil.dev_transfer_task_list
 
-        self.model.eval()
         results = EvaluationUtil.dev_eval(
             model = self.model,
             tokenizer = self.tokenizer,

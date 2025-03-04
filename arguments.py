@@ -413,6 +413,16 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "GPU number."},
     )
 
+    eval_dataset: Optional[str] = field(
+        default=None,
+        metadata={"help": "The evaluation dataset."},
+    )
+
+    eval_dataset_name: Optional[str] = field(
+        default=None,
+        metadata={"help": "The evaluation dataset name."},
+    )
+
     # 设置torch
     def __post_init__(self):
 
@@ -425,8 +435,6 @@ class OurTrainingArguments(TrainingArguments):
             self.run_name = self.output_dir.split("/")[-1]
 
         super().__post_init__()
-
-
 
 
 @dataclass

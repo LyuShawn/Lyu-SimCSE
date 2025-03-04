@@ -9,6 +9,8 @@ from arguments import ModelArguments,EvalArguments
 from datetime import datetime
 from simcse.models import Pooler
 import torch.nn.functional as F
+import numpy as np
+from scipy.stats import pearsonr, spearmanr
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -31,12 +33,15 @@ class EvaluationUtil:
     dev_sts_task_list = ["STSBenchmark", "SICKRelatedness"]
     dev_transfer_task_list = transfer_task_list
 
-    def __init__(self, path, model_args, task_set="sts", mode="test", *args ,**kwargs):
+    def __init__(self, path, model_args, task_set="sts", mode="test", dataset=None,dataset_name=None, *args ,**kwargs):
         """数据准备"""
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
+        
+        self.dataset = dataset
+        self.dataset_name = dataset_name
 
         self.model_args = model_args
         self.task_set = task_set
@@ -109,15 +114,25 @@ class EvaluationUtil:
             model = AutoModel.from_pretrained(path).to(self.device)
             tokenizer = AutoTokenizer.from_pretrained(path)
 
-            result = self.eval_core(
-                model=model,
-                tokenizer=tokenizer,
-                tasks=self.tasks,
-                params=self.params,
-                pooler=self.pooler,
-                model_args=self.model_args,
-            )
-            result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
+            if self.dataset is not None:
+                result = self.eval_by_dataset(
+                    model=model,
+                    tokenizer=tokenizer,
+                    dataset=self.dataset,
+                    dataset_name=self.dataset_name,
+                    mode = self.mode,
+                )
+                result['avg'] = result['spearman']
+            else:
+                result = self.eval_core(
+                    model=model,
+                    tokenizer=tokenizer,
+                    tasks=self.tasks,
+                    params=self.params,
+                    pooler=self.pooler,
+                    model_args=self.model_args,
+                )
+                result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
             eval_result["eval_details"].append({
                 "path": path,
                 "result": result,
@@ -275,6 +290,7 @@ class EvaluationUtil:
             )
             for k in batch:
                 batch[k] = batch[k].to(device)
+            model.eval()
             with torch.no_grad():
                 outputs = model(**batch, output_hidden_states=True, return_dict=True, sent_emb=True)
             return outputs.pooler_output
@@ -301,6 +317,104 @@ class EvaluationUtil:
         params["similarity"]= lambda s1, s2: F.cosine_similarity(s1, s2,dim=-1).tolist()
 
         return params
+
+    @classmethod
+    def eval_by_dataset_core(cls, model, tokenizer,dataset, sent1_name, sent2_name, label_name, bs=64):
+        """评估核心，与senteval不同的是，这里是自己控制数据集
+        评估由自己写
+        """
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        pooler = Pooler("cls").to(device)
+
+        def sent_tokenize(examples):
+            total = len(examples[sent1_name])
+            sentences = examples[sent1_name] + examples[sent2_name]
+            sent_features = tokenizer(sentences, return_tensors="pt", padding=True, truncation=False)
+            features = {}
+            for key in sent_features:
+                features[key] = [[sent_features[key][i], sent_features[key][i+total]] for i in range(total)]
+            return features
+
+        dataset_tokenize = dataset.map(sent_tokenize, 
+                                    batched=True,
+                                    load_from_cache_file=True)
+
+        cos_sim_list = []
+        for batch in dataset_tokenize.batch(bs):
+            input_ids = batch["input_ids"]
+            attention_mask = batch["attention_mask"]
+
+            flat_input_ids = []
+            flat_attention_mask = []
+            for i in range(len(input_ids)):
+                flat_input_ids.extend(input_ids[i])
+                flat_attention_mask.extend(attention_mask[i])
+
+            # 对齐
+            ml = max([len(i) for i in flat_input_ids])
+            for i in range(len(flat_input_ids)):
+                flat_input_ids[i] = flat_input_ids[i] + [tokenizer.pad_token_id]*(ml-len(flat_input_ids[i]))
+                flat_attention_mask[i] = flat_attention_mask[i] + [0] * (ml-len(flat_attention_mask[i]))
+            input_ids = torch.tensor(flat_input_ids, dtype=torch.long).to(device)
+            attention_mask = torch.tensor(flat_attention_mask, dtype=torch.long).to(device)
+
+            with torch.no_grad():
+                try:
+                    outputs = model(
+                        input_ids=input_ids, 
+                        attention_mask=attention_mask, 
+                        output_hidden_states=True, 
+                        return_dict=True,
+                        sent_emb=True)
+                except:
+                    outputs = model(
+                        input_ids=input_ids, 
+                        attention_mask=attention_mask, 
+                        output_hidden_states=True, 
+                        return_dict=True,)
+
+            # (bs*2, hidden_size)
+            pooler_output = pooler(attention_mask=attention_mask, outputs=outputs, input_ids=input_ids, mask_token_id=tokenizer.mask_token_id, use_pooler_output=True)
+            pooler_output = pooler_output.view(-1, 2, pooler_output.size(-1)) # (bs, 2, hidden_size)
+
+            z1 = pooler_output[:, 0]    # (bs, hidden_size)
+            z2 = pooler_output[:, 1]    # (bs, hidden_size)
+            
+            cos_sim = F.cosine_similarity(z1, z2, dim=-1) # (bs,)
+            cos_sim_list.extend(cos_sim.tolist())
+        assert len(cos_sim_list) == len(dataset), f"cos_sim_list:{len(cos_sim_list)}, dataset:{len(dataset)}"
+
+        # 计算spearman相关系数和pearson相关系数
+        label_list = np.array(dataset[label_name])
+        # label除5
+        cos_sim_list = np.array(cos_sim_list)
+        spearman_corr, _ = spearmanr(cos_sim_list, label_list)
+        pearson_corr, _ = pearsonr(cos_sim_list, label_list)
+        return {"spearman": spearman_corr, "pearson": pearson_corr}
+
+    @classmethod
+    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=64):
+        """自己控制数据集"""
+        # 判断数据集名称切分
+        if "stsb_multi_mt" in dataset_name:
+            # 多语言stsb数据集，切出dev数据集
+            if mode == "test":
+                dataset = dataset["test"]
+            elif mode == "dev":
+                dataset = dataset["dev"]
+            else:
+                raise NotImplementedError
+            sent1_name = "sentence1"
+            sent2_name = "sentence2"
+            label_name = "similarity_score"
+
+        else:
+            raise NotImplementedError
+
+        # 按照batch_size处理数据
+        return cls.eval_by_dataset_core(model,tokenizer , dataset, sent1_name, sent2_name, label_name, bs=bs)
+
+        
 
 def main():
     # 解析命令行参数
