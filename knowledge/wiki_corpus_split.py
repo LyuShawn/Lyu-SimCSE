@@ -53,7 +53,7 @@ def main(args):
         offset += limit
         for page_id, page_content in page_content_dict.items():
             if lang == 'zh':
-                sent_list += jieba.cut(page_content)
+                sent_list += sent_tokenize(page_content)
             else:
                 sent_list += sent_tokenize(page_content, language=lang_mapping[lang])
         pbar.set_description_str(f"collecting sentences: {len(sent_list)}")

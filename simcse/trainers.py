@@ -18,13 +18,16 @@ class CLTrainer(Trainer):
         if self.eval_dataset is not None:
             # 使用传入的eval_dataset
             dataset_name = self.args.eval_dataset
-            metrics = EvaluationUtil.eval_by_dataset(
+            results = EvaluationUtil.eval_by_dataset(
                 model=self.model,
                 tokenizer=self.tokenizer,
                 dataset = self.eval_dataset,
                 dataset_name=dataset_name,
                 mode = "dev",
             )
+            metrics = {}
+            for key in results:
+                metrics["eval_{}".format(key)] = results[key]
 
             self.log(metrics)
 
