@@ -38,24 +38,33 @@ def main(args):
     offset = 0
     limit = 1000
 
-    total = MySQL.get_wiki_page_content_multilingual_len(lang)
+    if multi_lang:
+        total = MySQL.get_wiki_page_content_multilingual_len(lang)
+    else:
+        total = MySQL.get_wiki_page_content_len(domain)
 
     pbar = tqdm(total=total, desc="collecting sentences")
 
     sent_list = []
 
     while True:
-        page_content_dict = MySQL.get_wiki_page_content_multilingual(lang, offset) 
+        if multi_lang:
+            page_content_dict = MySQL.get_wiki_page_content_multilingual(lang, offset, limit)
+        else:
+            page_content_dict = MySQL.get_wiki_page_content(domain, offset) 
         if not page_content_dict:
             logging.info("no more page content")
             break
         pbar.update(len(page_content_dict))
         offset += limit
         for page_id, page_content in page_content_dict.items():
-            if lang == 'zh':
-                sent_list += sent_tokenize(page_content)
+            if multi_lang:
+                if lang == 'zh':
+                    sent_list += sent_tokenize(page_content)
+                else:
+                    sent_list += sent_tokenize(page_content, language=lang_mapping[lang])
             else:
-                sent_list += sent_tokenize(page_content, language=lang_mapping[lang])
+                sent_list += sent_tokenize(page_content)
         pbar.set_description_str(f"collecting sentences: {len(sent_list)}")
 
     logging.info(f"total sentences: {len(sent_list)}")

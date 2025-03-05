@@ -227,3 +227,15 @@ class MySQLClient(metaclass=SingletonMeta):
         page_content_len = page_content_len[0][0]
         cursor.close()
         return page_content_len
+
+    def get_wiki_page_content_len(self, domain):
+        """获取维基页面内容"""
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT count(id) FROM t_page_content WHERE domain = %s;
+            """
+        cursor.execute(sql, (domain))
+        page_content_len = cursor.fetchall()
+        page_content_len = page_content_len[0][0]
+        cursor.close()
+        return page_content_len
