@@ -11,6 +11,7 @@ from simcse.models import Pooler
 import torch.nn.functional as F
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
+from tqdm import tqdm
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -326,6 +327,8 @@ class EvaluationUtil:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         pooler = Pooler("cls").to(device)
 
+        model.to(device)
+
         def sent_tokenize(examples):
             total = len(examples[sent1_name])
             sentences = examples[sent1_name] + examples[sent2_name]
@@ -337,10 +340,11 @@ class EvaluationUtil:
 
         dataset_tokenize = dataset.map(sent_tokenize, 
                                     batched=True,
-                                    load_from_cache_file=True)
+                                    load_from_cache_file=False)
 
         cos_sim_list = []
-        for batch in dataset_tokenize.batch(bs):
+        # 按照batch_size处理数据
+        for batch in tqdm(dataset_tokenize.batch(bs), desc="evaluating"):
             input_ids = batch["input_ids"]
             attention_mask = batch["attention_mask"]
 
