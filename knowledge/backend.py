@@ -145,6 +145,28 @@ class MySQLClient(metaclass=SingletonMeta):
         self.connection.commit()
         cursor.close()
 
+    def get_sent_page_in_page_id_num(self):
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT count(DISTINCT page_id) FROM t_sent_page_in;
+            """
+        cursor.execute(sql)
+        page_id_num = cursor.fetchall()
+        page_id_num = page_id_num[0][0]
+        cursor.close()
+        return page_id_num
+
+    def batch_get_sent_page_in_page_id(self, offset,limit=1000):
+        """只拿pageid_list, page_id去重"""
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT DISTINCT page_id FROM t_sent_page_in LIMIT %s, %s;
+            """
+        cursor.execute(sql, (offset, limit))
+        page_id_list = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        return page_id_list
+
     def batch_insert_sent_page_in(self, sent_page_in_list):
         """批量插入sent和page相关的信息"""
         if not sent_page_in_list:
@@ -239,3 +261,36 @@ class MySQLClient(metaclass=SingletonMeta):
         page_content_len = page_content_len[0][0]
         cursor.close()
         return page_content_len
+
+    def page_info_exist(self, page_id_list, lang):
+        """检查page_id是否存在"""
+        if not page_id_list:
+            return [], []
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT page_id FROM t_page_info WHERE page_id IN %s AND lang = %s;
+            """
+        cursor.execute(sql, (page_id_list, lang))
+        existing_keys = [row[0] for row in cursor.fetchall()]
+        non_existing_keys = list(set(page_id_list) - set(existing_keys))
+        cursor.close()
+        return existing_keys, non_existing_keys
+
+    def batch_insert_page_info(self, page_info_list,lang):
+        """批量插入page相关的信息"""
+        if not page_info_list:
+            return
+
+        # 如果每个元素是dict而不是tuple，需要转换为tuple
+        if isinstance(page_info_list[0], dict):
+            page_info_list = [(item['page_id'], item['title'], item['full_url'], item['categories'],lang) for item in page_info_list]
+
+        cursor = self.connection.cursor()
+        sql = """
+            INSERT INTO t_page_info (page_id, title, full_url, categories, lang)
+            VALUES (%s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE page_id = page_id;
+            """
+        cursor.executemany(sql,page_info_list) 
+        self.connection.commit()
+        cursor.close()
