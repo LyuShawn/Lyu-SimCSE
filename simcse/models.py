@@ -140,6 +140,7 @@ def cl_forward(cls,
     mlm_input_ids=None,
     mlm_labels=None,
     sent_knowledge=None,
+    category_input_ids=None,
 ):
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
@@ -156,6 +157,80 @@ def cl_forward(cls,
     attention_mask = attention_mask.view((-1, attention_mask.size(-1))) # (bs * num_sent len)
     if token_type_ids is not None:
         token_type_ids = token_type_ids.view((-1, token_type_ids.size(-1))) # (bs * num_sent, len)
+
+    if category_input_ids:
+        c_max_length = 64
+        # 每两个取一个
+        num_list = [len(i) for i in category_input_ids]
+        category_input_ids_processed = []
+        if cls.model_args.category_label_type == "concat":
+            # 拼接，每个拼在一起，第一个保留cls，最后一个保留pad
+            for item in category_input_ids:
+                # 把每个item拉平
+                item = [i for sublist in item for i in sublist]
+                # 添加cls和mask
+                ii = [cls.cls_token_id] + item[:c_max_length] + [cls.mask_token_id]
+                category_input_ids_processed.append(ii)
+
+        elif cls.model_args.category_label_type == "max_pooler" or cls.model_args.category_label_type == "avg_pooler":
+            # 这两个都是直接排出list
+            for item in category_input_ids:
+                # 不拉平直接添加
+                for c_feature in item:
+                    category_input_ids_processed.append([cls.cls_token_id] + c_feature[:c_max_length] + [cls.mask_token_id])
+        else:
+            raise NotImplementedError
+
+        # 对齐并转换为tensor
+        category_input_ids = category_input_ids_processed
+        category_attention_mask = [[1] * len(i) for i in category_input_ids]
+        max_len = max([len(i) for i in category_input_ids])
+        for i in range(len(category_input_ids)):
+            category_input_ids[i] = category_input_ids[i] + [cls.pad_token_id] * (max_len - len(category_input_ids[i]))
+            category_attention_mask[i] = category_attention_mask[i] + [0] * (max_len - len(category_attention_mask[i]))
+        category_input_ids = torch.tensor(category_input_ids, dtype=torch.long).to(cls.device)
+        category_attention_mask = torch.tensor(category_attention_mask, dtype=torch.long).to(cls.device)
+
+        # encoder
+        category_outputs = encoder(
+            input_ids=category_input_ids,
+            attention_mask=category_attention_mask,
+            return_dict=True,
+        )
+        last_hidden_state = category_outputs.last_hidden_state
+        if cls.model_args.category_label_type == "concat":
+            pooler_output = last_hidden_state[:, 0] # (bs * 2, hidden)
+            # 差空取出bs
+            pooler_output = pooler_output.view((batch_size, num_sent, hidden_dim))
+            z1 = pooler_output[:, 0]
+            z2 = pooler_output[:, 1]
+        else:
+            # 根据num_list切分
+            pooler_output = []
+            start = 0
+            for i in num_list:
+                pooler_output.append(last_hidden_state[start:start+i, 0])
+                start += i
+            # 此时pooler_output是一个list，每个元素是多个句子的cls
+            assert len(pooler_output) == batch_size * 2
+            # 对每个做不同池化
+            pooler_output_processed = []
+            for item in pooler_output:
+                if cls.model_args.category_label_type == "max_pooler":
+                    item = torch.max(item, dim=0)[0]
+                elif cls.model_args.category_label_type == "avg_pooler":
+                    item = torch.mean(item, dim=0)
+                else:
+                    raise NotImplementedError
+                pooler_output_processed.append(item)
+            # pooler_output_processed 转换为tensor
+            pooler_output = torch.stack(pooler_output_processed)    # (bs * 2, hidden)
+            pooler_output = pooler_output.view((batch_size, num_sent, hidden_dim))
+            z1 = pooler_output[:, 0]
+            z2 = pooler_output[:, 1]
+        # 根据z1，z2计算相似度
+        c_cim = Similarity(temp=cls.model_args.category_temp)
+        c_cos_sim = c_cim(z1.unsqueeze(1), z2.unsqueeze(0))
 
     # Get raw embeddings    (bs * num_sent, len, hidden)
     outputs = encoder(
@@ -255,6 +330,10 @@ def cl_forward(cls,
 
         ksl = loss_fct(k_sim, labels)
         loss = loss + cls.model_args.knowledge_loss_weight * ksl
+
+    if cls.model_args.category_label:
+        c_loss = loss_fct(c_cos_sim, labels)
+        loss += cls.model_args.category_label_loss_weight * c_loss
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:
@@ -357,7 +436,6 @@ def sentemb_forward(
         hidden_states=outputs.hidden_states,
     )
 
-
 class BertForCL(BertPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
@@ -392,6 +470,7 @@ class BertForCL(BertPreTrainedModel):
         mlm_input_ids=None,
         mlm_labels=None,
         sent_knowledge=None,
+        category_input_ids=None,
     ):
         if sent_emb:
             return sentemb_forward(self, self.bert,
@@ -421,6 +500,7 @@ class BertForCL(BertPreTrainedModel):
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
                 sent_knowledge=sent_knowledge,
+                category_input_ids=category_input_ids,
             )
 
 
@@ -452,6 +532,7 @@ class RobertaForCL(RobertaPreTrainedModel):
         sent_emb=False,
         mlm_input_ids=None,
         mlm_labels=None,
+        category_input_ids=None,
     ):
         if sent_emb:
             return sentemb_forward(self, self.roberta,
@@ -480,4 +561,5 @@ class RobertaForCL(RobertaPreTrainedModel):
                 return_dict=return_dict,
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
+                category_input_ids=category_input_ids,
             )

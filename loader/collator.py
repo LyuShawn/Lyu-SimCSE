@@ -65,6 +65,9 @@ class OurDataCollatorWithPadding:
         attention_mask = torch.tensor(attention_mask, dtype=torch.long)
         batch = {"input_ids": input_ids, "attention_mask": attention_mask}
 
+        if features[0].get('category_input_ids', None) is not None:
+            batch['category_input_ids'] = [f['category_input_ids'] for f in flat_features]
+
         if has_sent_knowledge:
             batch['sent_knowledge'] = {'input_ids': sent_knowledge_input_ids, 'attention_mask': sent_knowledge_attention_mask}
 

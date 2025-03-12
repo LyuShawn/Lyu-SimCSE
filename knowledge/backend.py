@@ -294,3 +294,31 @@ class MySQLClient(metaclass=SingletonMeta):
         cursor.executemany(sql,page_info_list) 
         self.connection.commit()
         cursor.close()
+
+    def get_category_by_md5(self, sent_md5):
+        """根据单个sent_md5获取category
+        """
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT pi.categories
+            FROM t_page_info pi
+            JOIN (
+                SELECT page_id
+                FROM t_sent_page_in
+                WHERE sent_md5 = %s
+                ORDER BY id
+                LIMIT 1
+            ) sp ON pi.page_id = sp.page_id;
+        """
+        cursor.execute(sql, (sent_md5,))  # 传入单个sent_md5
+        category_list = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        return category_list[0] if category_list else None
+
+def main():
+    test_md5 = "ea4da97a4fae5c41e0f764431ae3d35b"
+    mysql = MySQLClient()
+    category = mysql.get_category_by_md5([test_md5])
+
+if __name__ == "__main__":
+    main()

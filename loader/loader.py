@@ -1,5 +1,7 @@
 from knowledge.retrieval import retrieval_knowledge
 from knowledge.prompt import get_random_prompt
+from knowledge.backend import MySQLClient
+from utils.sentence_util import text_md5
 
 class PrepareFeaturesArgs:
     def __init__(self, tokenizer, data_args, model_args, sent0_cname, sent1_cname, sent2_cname):
@@ -38,6 +40,8 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             if examples[sent2_cname][idx] is None:
                 examples[sent2_cname][idx] = " "
         sentences += examples[sent2_cname]
+
+    features = {}
 
     if model_args.knowledge_hard_negative:
         from knowledge.retrieval import retrieval_knowledge_sentence
@@ -145,7 +149,6 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
-    features = {}
     if model_args.knowledge_hard_negative:
         for key in sent_features:
             features[key] = [[sent_features[key][i], sent_features[key][i+total], sent_features[key][i+total*2]] for i in range(total)]
@@ -160,5 +163,32 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
         # 如果需要知识融合，对每个原始句子做知识检索，并tokenize
         sent_knowledge_features = tokenizer(knowledge_list)
         features['sent_knowledge'] = sent_knowledge_features['input_ids']
+
+    if model_args.category_label:
+        MySQL = MySQLClient()
+        sent_category_list = []
+        # 获取每个句子的category
+        for sent in examples[sent0_cname]:
+            sent_md5 = text_md5(sent)
+            category_str = MySQL.get_category_by_md5(sent_md5)
+            if not category_str:
+                sent_category_list.append(['unknown'])
+            else:
+                category = category_str.replace('Category:', '')
+                category = category.split('|')
+                sent_category_list.append(category)
+        # sent_category_list 是每个句子的category
+        # token化
+        category_feature_input_ids = []
+        num_list = [len(i) for i in sent_category_list]
+        # 拉平
+        sent_category_list = [i for j in sent_category_list for i in j]
+        category_features = tokenizer(sent_category_list, padding=False, truncation=True, max_length=32,add_special_tokens=False)
+        # 重新分组
+        start = 0
+        for num in num_list:
+            category_feature_input_ids.append(category_features['input_ids'][start:start+num])
+            start += num
+        features['category_input_ids'] = category_feature_input_ids
 
     return features

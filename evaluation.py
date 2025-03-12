@@ -428,7 +428,7 @@ def main():
     eval_util = EvaluationUtil(**eval_args.__dict__, model_args=model_args)
 
     result = eval_util.eval()
-    print(result)
+    print(json.dumps(result, indent=4, ensure_ascii=False))
 
 
 if __name__ == "__main__":

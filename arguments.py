@@ -233,6 +233,36 @@ class ModelArguments:
     )
 
 
+    # 类别标签判定  相关参数
+    category_label: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use category label."
+        }
+    )
+    # 损失函数的权重
+    category_label_loss_weight: float = field(
+        default=0.1,
+        metadata={
+            "help": "The weight of category label."
+        }
+    )
+    # 类别的融合方式
+    category_label_type: Literal["concat","avg_pooler","max_pooler"] = field(
+        default="avg_pooler",
+        metadata={
+            "help": "The type of category label."
+        }
+    )
+    # 类别标签的温度系数
+    category_temp: float = field(
+        default=0.05,
+        metadata={
+            "help": "The temperature of category label."
+        }
+    )
+
+
 
 @dataclass
 class DataTrainingArguments:

@@ -176,6 +176,7 @@ def main():
 
     model.mask_token_id = tokenizer.mask_token_id
     model.pad_token_id = tokenizer.pad_token_id
+    model.cls_token_id = tokenizer.cls_token_id
     if model_args.do_prompt_enhancement:
 
         template = model_args.prompt_template.replace('[MASK]', tokenizer.mask_token)
