@@ -159,7 +159,7 @@ def cl_forward(cls,
         token_type_ids = token_type_ids.view((-1, token_type_ids.size(-1))) # (bs * num_sent, len)
 
     if category_input_ids:
-        c_max_length = 32
+        c_max_length = 64
         max_c_num = 8  # 最多10个类别
         # 每两个取一个
         num_list = [len(i) for i in category_input_ids]
