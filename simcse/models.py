@@ -159,13 +159,14 @@ def cl_forward(cls,
         token_type_ids = token_type_ids.view((-1, token_type_ids.size(-1))) # (bs * num_sent, len)
 
     if category_input_ids:
-        c_max_length = 64
+        c_max_length = 32
+        max_c_num = 8  # 最多10个类别
         # 每两个取一个
         num_list = [len(i) for i in category_input_ids]
         category_input_ids_processed = []
         if cls.model_args.category_label_type == "concat":
             # 拼接，每个拼在一起，第一个保留cls，最后一个保留pad
-            for item in category_input_ids:
+            for item in category_input_ids[:max_c_num]:
                 # 把每个item拉平
                 item = [i for sublist in item for i in sublist]
                 # 添加cls和mask
