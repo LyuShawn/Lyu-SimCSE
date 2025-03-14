@@ -162,7 +162,7 @@ def cl_forward(cls,
         c_max_length = 64
         max_c_num = 6  # 最多10个类别
         # 每两个取一个
-        num_list = [len(i) for i in category_input_ids]
+        num_list = [min(len(s), max_c_num) for s in category_input_ids]
         category_input_ids_processed = []
         if cls.model_args.category_label_type == "concat":
             # 拼接，每个拼在一起，第一个保留cls，最后一个保留pad
