@@ -167,6 +167,20 @@ class MySQLClient(metaclass=SingletonMeta):
         cursor.close()
         return page_id_list
 
+    def get_sent_page_in_by_md5(self, sent_md5):
+        """返回list"""
+        if not sent_md5:
+            return None
+        sql = """
+            SELECT title FROM t_sent_page_in WHERE sent_md5 = %s;
+            """
+        cursor = self.connection.cursor()
+        cursor.execute(sql, (sent_md5,))
+        title_list = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        return title_list
+
+
     def batch_insert_sent_page_in(self, sent_page_in_list):
         """批量插入sent和page相关的信息"""
         if not sent_page_in_list:

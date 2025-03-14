@@ -1,20 +1,17 @@
-from knowledge.backend import RedisClient
+from knowledge.backend import RedisClient, MySQLClient
 from utils.sentence_util import text_encode
 import json
 from utils.cache_util import disk_cache
+from utils.sentence_util import text_md5
 
 def retrieval_knowledge_title(sent_list):
-    redis_client = RedisClient()
-    prifix = "wikisearch:"
-    keys = [prifix + text_encode(sent) for sent in sent_list]
-    values = redis_client.mget(keys)
+    """搜索句子对应的知识标题"""
+    mysql = MySQLClient()
     result = []
-    for value in values:
-        if not value:
-            result.append([])
-            continue
-        value = json.loads(value)
-        result.append([item["title"] for item in value])
+    for sent in sent_list:
+        sent_md5 = text_md5(sent)
+        title_list = mysql.get_sent_page_in_by_md5(sent_md5)
+        result.append(title_list)
     return result
 
 def retrieval_knowledge_summary(sent_list,max_length = -1):
@@ -52,7 +49,7 @@ def retrieval_knowledge_summary(sent_list,max_length = -1):
             result.append(" ".join(summary))
     return result
 
-@disk_cache
+
 def retrieval_knowledge_sentence(sent_list,max_length = -1):
         redis_client = RedisClient(db=2)
         prifix = "similarity_sent_"
@@ -68,7 +65,6 @@ def retrieval_knowledge_sentence(sent_list,max_length = -1):
                 result.append(value)
         return result
 
-@disk_cache
 def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
     """
         查询知识
