@@ -198,6 +198,7 @@ def cl_forward(cls,
             attention_mask=category_attention_mask,
             return_dict=True,
         )
+        del category_input_ids, category_attention_mask
         last_hidden_state = category_outputs.last_hidden_state
         if cls.model_args.category_label_type == "concat":
             pooler_output = last_hidden_state[:, 0] # (bs * 2, hidden)
@@ -227,6 +228,7 @@ def cl_forward(cls,
             # pooler_output_processed 转换为tensor
             pooler_output = torch.stack(pooler_output_processed)    # (bs * 2, hidden)
             pooler_output = pooler_output.view((batch_size, num_sent, hidden_dim))
+            del pooler_output_processed, pooler_output
             z1 = pooler_output[:, 0]
             z2 = pooler_output[:, 1]
         # 根据z1，z2计算相似度
