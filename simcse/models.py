@@ -228,7 +228,8 @@ def cl_forward(cls,
             # pooler_output_processed 转换为tensor
             pooler_output = torch.stack(pooler_output_processed)    # (bs * 2, hidden)
             pooler_output = pooler_output.view((batch_size, num_sent, hidden_dim))
-            del pooler_output_processed, pooler_output
+            del pooler_output_processed
+            torch.cuda.empty_cache()
             z1 = pooler_output[:, 0]
             z2 = pooler_output[:, 1]
         # 根据z1，z2计算相似度
