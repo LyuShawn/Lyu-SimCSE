@@ -262,6 +262,13 @@ class ModelArguments:
         }
     )
 
+    category_max_num: int = field(
+        default=16,
+        metadata={
+            "help": "The max number of category label."
+        }
+    )
+
 
 
 @dataclass

@@ -160,7 +160,7 @@ def cl_forward(cls,
 
     if category_input_ids:
         c_max_length = 64
-        max_c_num = 10  # 最多10个类别
+        max_c_num = cls.model_args.category_max_num  # 最多10个类别
         # 每两个取一个
         num_list = [min(len(s), max_c_num) for s in category_input_ids]
         category_input_ids_processed = []
