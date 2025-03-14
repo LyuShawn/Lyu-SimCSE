@@ -168,16 +168,16 @@ def cl_forward(cls,
             # 拼接，每个拼在一起，第一个保留cls，最后一个保留pad
             for item in category_input_ids:
                 # 把每个item拉平
-                item = [i for sublist in item for i in sublist]
+                i = [i for sublist in item for i in sublist]
                 # 添加cls和mask
-                ii = [cls.cls_token_id] + item[:c_max_length] + [cls.mask_token_id]
+                ii = [cls.cls_token_id] + i[:c_max_length] + [cls.mask_token_id]
                 category_input_ids_processed.append(ii)
 
         elif cls.model_args.category_label_type == "max_pooler" or cls.model_args.category_label_type == "avg_pooler":
             # 这两个都是直接排出list
-            for item in category_input_ids[:max_c_num]:
+            for item in category_input_ids:
                 # 不拉平直接添加
-                for c_feature in item:
+                for c_feature in item[:max_c_num]:
                     category_input_ids_processed.append([cls.cls_token_id] + c_feature[:c_max_length] + [cls.mask_token_id])
         else:
             raise NotImplementedError
