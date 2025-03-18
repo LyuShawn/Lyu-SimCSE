@@ -14,7 +14,8 @@
             "console": "integratedTerminal",
             "args": [
                 "${command:pickArgs}"
-            ]
+            ],
+            "justMyCode": false
         },
         {
             "name": "SimCSE Debug",

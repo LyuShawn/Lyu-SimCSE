@@ -481,12 +481,6 @@ class EvalArguments:
         metadata={"help": "The path to the model checkpoint."},
     )
 
-    pooler : str = field(
-        default="cls",
-        metadata={"help": "The pooler type.",
-                "choices": ["cls", "cls_before_pooler", "avg", "avg_top2", "avg_first_last"]},
-    )
-
     mode: str = field(
         default="test",
         metadata={"help": "The evaluation mode.",
@@ -496,7 +490,7 @@ class EvalArguments:
     task_set: str = field(
         default="sts",
         metadata={"help": "The task set.",
-                "choices": ["sts", "transfer", "full","na"]},
+                "choices": ["sts", "transfer", "full","cross_lingual"]},
     )
 
     times: int = field(

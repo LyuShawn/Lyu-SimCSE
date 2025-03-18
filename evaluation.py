@@ -12,6 +12,9 @@ import torch.nn.functional as F
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
 from tqdm import tqdm
+from mteb.encoder_interface import PromptType
+from typing import Optional
+import mteb
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -19,6 +22,67 @@ PATH_TO_DATA = './SentEval/data'
 sys.path.insert(0, PATH_TO_SENTEVAL)
 import senteval
 
+class CustomMtebModel:
+    def __init__(self, model_name, pooler='cls'):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        if "msimcse" in model_name:
+            self.tokenizer = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large")
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+        load_args = {}
+        if pooler in ['avg_top2', 'avg_first_last']:
+            load_args = {'output_hidden_states': True}
+
+        self.model = AutoModel.from_pretrained(model_name,**load_args).to(self.device)
+
+        self.pooler = Pooler(pooler)
+        self.model_name = model_name
+        self.model_card_data = {
+            "model_name": model_name,
+            "pooling": pooler,
+            "framework": "PyTorch",
+        }
+
+    def encode(
+            self,
+            sentences: list[str],
+            task_name: str,
+            prompt_type: Optional[PromptType] = None,
+            batch_size: int = 64,
+            **kwargs,
+        ) -> np.ndarray:
+            """Encodes the given sentences using the encoder.
+
+            Args:
+                sentences: The sentences to encode.
+                task_name: The name of the task.
+                prompt_type: The prompt type to use.
+                **kwargs: Additional arguments to pass to the encoder.
+
+            Returns:
+                The encoded sentences.
+            """
+
+            # 实现编码逻辑
+            total = len(sentences)
+            for i in tqdm(range(0, total, batch_size), desc="Encoding"):
+                batch = sentences[i:i+batch_size]
+                inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                with torch.no_grad():
+                    outputs = self.model(**inputs)
+                    pooler_output = self.pooler(**inputs, outputs=outputs)
+                if i == 0:
+                    all_embeddings = pooler_output
+                else:
+                    all_embeddings = torch.cat((all_embeddings, pooler_output), dim=0)
+            return all_embeddings.cpu().numpy()
+
+mteb_task_set_list = ["cross_lingual"]
+lang_list = 'ar he vi id jv tl eu ml ta te af nl de el bn hi mr ur fa fr it pt es bg ru ja ka ko th sw zh kk tr et fi hu az lt pl uk ro'.split()
+lang_list14 = 'ar bg zh de el fr hi ru es sw th tr ur vi'.split()
+lang_list36 = 'af bn et eu fi he hu id it jv ja ka kk ko ml mr nl fa pt ta te tl'.split()
 class EvaluationUtil:
 
     sts_task_list =[
@@ -56,6 +120,10 @@ class EvaluationUtil:
             self.tasks = self.transfer_task_list
         elif self.task_set == "full":
             self.tasks = self.sts_task_list + self.transfer_task_list
+        elif self.task_set == "cross_lingual":
+            self.tasks = ["BUCC.v2", "Tatoeba"]
+        else:
+            raise NotImplementedError
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -112,28 +180,43 @@ class EvaluationUtil:
 
         for path in self.path:
 
-            model = AutoModel.from_pretrained(path).to(self.device)
-            tokenizer = AutoTokenizer.from_pretrained(path)
-
-            if self.dataset is not None:
-                result = self.eval_by_dataset(
-                    model=model,
-                    tokenizer=tokenizer,
-                    dataset=self.dataset,
-                    dataset_name=self.dataset_name,
-                    mode = self.mode,
-                )
-                result['avg'] = result['spearman']
+            if self.task_set in mteb_task_set_list:
+                model = CustomMtebModel(path, pooler=self.pooler_type)
+                tasks = mteb.get_tasks(tasks=self.tasks)
+                evaluation = mteb.MTEB(tasks=tasks)
+                results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
+                # result = results[0]
+                # scores = result.scores["test"]
+                # print(scores)
+                # # 计算平均值
+                # sum_score = sum([score['main_score'] for score in scores])
+                # mean_score = sum_score / len(scores)
+                # print(f"Mean score: {mean_score}")
+                return results
             else:
-                result = self.eval_core(
-                    model=model,
-                    tokenizer=tokenizer,
-                    tasks=self.tasks,
-                    params=self.params,
-                    pooler=self.pooler,
-                    model_args=self.model_args,
-                )
-                result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
+                model = AutoModel.from_pretrained(path).to(self.device)
+                tokenizer = AutoTokenizer.from_pretrained(path)
+
+                if self.dataset is not None:
+                    # 指定数据集
+                    result = self.eval_by_dataset(
+                        model=model,
+                        tokenizer=tokenizer,
+                        dataset=self.dataset,
+                        dataset_name=self.dataset_name,
+                        mode = self.mode,
+                    )
+                    result['avg'] = result['spearman']
+                else:
+                    result = self.eval_core(
+                        model=model,
+                        tokenizer=tokenizer,
+                        tasks=self.tasks,
+                        params=self.params,
+                        pooler=self.pooler,
+                        model_args=self.model_args,
+                    )
+                    result = self.process_result(result, self.tasks, mode=self.mode, print_table_switch=self.print_table_switch)
             eval_result["eval_details"].append({
                 "path": path,
                 "result": result,

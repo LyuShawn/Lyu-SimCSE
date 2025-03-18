@@ -130,8 +130,11 @@ dmypy.json
 .pyre/
 .DS_Store
 # .vscode
-data
+data/*
+!data/*.sh
+draw/data/
 result
+results
 .venv-cu11
 wandb
 

@@ -20,3 +20,5 @@ amrlib
 wikipedia-api
 nltk
 pymysql
+faiss-gpu
+mteb
