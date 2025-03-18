@@ -338,7 +338,7 @@ class EvaluationUtil:
                         outputs = outputs,
                         input_ids = batch['input_ids'],
                         mask_token_id = tokenizer.mask_token_id,
-                        use_pooler_output = use_pooler_output)
+                        use_pooler_output = use_pooler_output).cpu()
 
         results = {}
 
