@@ -90,9 +90,10 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
                 if model_args.random_prompt:
                     prompt_template = get_random_prompt()
-                    prompt_template = prompt_template.replace("[MASK]", tokenizer.mask_token)
+                    prompt_template = prompt_template
                 else:
                     prompt_template = model_args.prompt_template
+                prompt_template = prompt_template.replace("[MASK]", tokenizer.mask_token)
 
                 knowledge = knowledge_list[i % total]
                 if knowledge:
@@ -122,7 +123,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
                 else:
                     raise NotImplementedError
                 if tokenizer.mask_token_id not in ii:
-                    raise Exception("prompt_suffix_input_ids should contain mask token")
+                    raise Exception("mask token shou in input_ids")
                 input_ids.append(ii)
 
             else:
