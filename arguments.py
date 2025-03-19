@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Literal
-
+from typing import Optional, Literal,Union
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
     TrainingArguments,
@@ -487,10 +486,16 @@ class EvalArguments:
                 "choices": ["dev", "test","fasttest"]},
     )
 
-    task_set: str = field(
+    task_set:str = field(
         default="sts",
         metadata={"help": "The task set.",
-                "choices": ["sts", "transfer", "full","cross_lingual"]},
+                "choices": ["sts", "transfer","full","mteb"]},
+        
+    )
+
+    mteb_task_set: str = field(
+        default=None,
+        metadata={"help": "The mteb task set."},
     )
 
     times: int = field(

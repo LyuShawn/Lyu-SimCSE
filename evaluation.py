@@ -15,6 +15,7 @@ from tqdm import tqdm
 from mteb.encoder_interface import PromptType
 from typing import Optional
 import mteb
+from mteb.task_selection import results_to_dataframe
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -65,11 +66,11 @@ class CustomMtebModel:
                 The encoded sentences.
             """
 
-            # 实现编码逻辑
+            # 实现encode方法
             total = len(sentences)
             for i in tqdm(range(0, total, batch_size), desc="Encoding"):
                 batch = sentences[i:i+batch_size]
-                inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors='pt',max_length=512).to(self.device)
                 with torch.no_grad():
                     outputs = self.model(**inputs)
                     pooler_output = self.pooler(**inputs, outputs=outputs)
@@ -79,7 +80,6 @@ class CustomMtebModel:
                     all_embeddings = torch.cat((all_embeddings, pooler_output), dim=0)
             return all_embeddings.cpu().numpy()
 
-mteb_task_set_list = ["cross_lingual"]
 lang_list = 'ar he vi id jv tl eu ml ta te af nl de el bn hi mr ur fa fr it pt es bg ru ja ka ko th sw zh kk tr et fi hu az lt pl uk ro'.split()
 lang_list14 = 'ar bg zh de el fr hi ru es sw th tr ur vi'.split()
 lang_list36 = 'af bn et eu fi he hu id it jv ja ka kk ko ml mr nl fa pt ta te tl'.split()
@@ -98,7 +98,7 @@ class EvaluationUtil:
     dev_sts_task_list = ["STSBenchmark", "SICKRelatedness"]
     dev_transfer_task_list = transfer_task_list
 
-    def __init__(self, path, model_args, task_set="sts", mode="test", dataset=None,dataset_name=None, *args ,**kwargs):
+    def __init__(self, path, model_args, task_set="sts", mode="test",mteb_task_set=None, dataset=None, dataset_name=None, *args ,**kwargs):
         """数据准备"""
         logging.basicConfig(
             level=logging.INFO,
@@ -114,14 +114,15 @@ class EvaluationUtil:
         self.print_table_switch = False if not kwargs.get("print_table", None) else kwargs.get("print_table")
 
         # Set up the tasks
-        if self.task_set == "sts":
+        if self.task_set == "mteb":
+            assert mteb_task_set is not None, "mteb_task_set must be specified"
+            self.tasks = mteb_task_set.split(',')
+        elif self.task_set == "sts":
             self.tasks = self.sts_task_list
         elif self.task_set == "transfer":
             self.tasks = self.transfer_task_list
         elif self.task_set == "full":
             self.tasks = self.sts_task_list + self.transfer_task_list
-        elif self.task_set == "cross_lingual":
-            self.tasks = ["BUCC.v2", "Tatoeba"]
         else:
             raise NotImplementedError
 
@@ -169,7 +170,8 @@ class EvaluationUtil:
     def eval(self):
         """评估入口"""
         logging.info(
-            f"start evaluation {self.path},with pooler={self.pooler_type},task_set={self.task_set},mode={self.mode}"
+            f"start evaluation {self.path},with pooler={self.pooler_type},task_set={self.task_set},mode={self.mode}" 
+            + (f",mteb_task_set={self.tasks}" if self.task_set == "mteb" else "")
         )
 
         eval_result = {
@@ -180,7 +182,7 @@ class EvaluationUtil:
 
         for path in self.path:
 
-            if self.task_set in mteb_task_set_list:
+            if self.task_set == "mteb":
                 model = CustomMtebModel(path, pooler=self.pooler_type)
                 tasks = mteb.get_tasks(tasks=self.tasks)
                 evaluation = mteb.MTEB(tasks=tasks)
@@ -192,7 +194,8 @@ class EvaluationUtil:
                 # sum_score = sum([score['main_score'] for score in scores])
                 # mean_score = sum_score / len(scores)
                 # print(f"Mean score: {mean_score}")
-                return results
+                result_list = [result.to_dict() for result in results]
+                return result_list
             else:
                 model = AutoModel.from_pretrained(path).to(self.device)
                 tokenizer = AutoTokenizer.from_pretrained(path)

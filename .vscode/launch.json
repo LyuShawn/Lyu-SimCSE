@@ -30,7 +30,7 @@
                 "--do_eval",
                 "--overwrite_cache",
                 "--do_prompt_enhancement",
-                "--sample_data","10000",
+                // "--sample_data","10000",
                 // "--batch_inner_shuffle",
                 // "--prompt_template", "This sentence of '{sentence}' means [MASK].",
                 "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",
@@ -61,7 +61,10 @@
             "program": "${workspaceFolder}/evaluation.py",
             "console": "integratedTerminal",
             "args": [
-                "--path", "model/unsup-PromptBERT-baseline/", "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
+                "--path", "kamalkraj/BioSimCSE-BioLinkBERT-BASE", 
+                "--task_set","mteb",
+                "--mteb_task_set", "BIOSSES"
+                // "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
                 // "--path", "model/unsup-simcse-bert-base-uncased/", "--task_set","transfer"
             ],
             "justMyCode": false
