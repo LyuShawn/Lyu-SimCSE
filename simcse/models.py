@@ -250,6 +250,7 @@ def cl_forward(cls,
         outputs2 = encoder(
             input_ids=input_ids2,
             attention_mask=attention_mask2,
+            output_hidden_states=True if cls.model_args.pooler_type in ['avg_top2', 'avg_first_last'] else False,
             return_dict=True,
         )
         pooler_output2 = cls.pooler(attention_mask2, outputs2, input_ids2, cls.mask_token_id)

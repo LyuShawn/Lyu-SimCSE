@@ -332,7 +332,7 @@ class MySQLClient(metaclass=SingletonMeta):
         sql = """
             INSERT INTO t_page_info (page_id, title, full_url, categories, lang, abstract)
             VALUES (%s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE title = title, full_url = full_url, categories = categories, abstract = abstract;
+            ON DUPLICATE KEY UPDATE page_id = page_id;
             """
         cursor.executemany(sql,page_info_list) 
         self.connection.commit()

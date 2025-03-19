@@ -2,6 +2,7 @@
 import requests
 from tqdm import tqdm
 from knowledge.backend import MySQLClient
+import random
 
 MySQL = MySQLClient()
 
@@ -9,7 +10,7 @@ WIKI_API = "https://en.wikipedia.org/w/api.php"
 
 total = MySQL.get_sent_page_in_page_id_num()
 pbar = tqdm(total=total)
-offset = 0
+offset = random.randint(0,total)
 limit=  1000
 lang = 'en'
 
@@ -48,21 +49,26 @@ def get_page_info(page_id_list):
     return page_info_list
 
 while True:
-    page_list = MySQL.batch_get_sent_page_in_page_id_random(limit=limit)
+    page_list = MySQL.batch_get_sent_page_in_page_id(offset,limit=limit)
 
     page_info_size = MySQL.get_page_info_size()
 
-    if not page_list or page_info_size >= total:
+    if page_info_size >= total:
         print('done')
         break
+    if not page_list:
+        offset = random.randint(0,total)
     offset += limit
-    pbar.update(len(page_list))
+    pbar.n = page_info_size
+    pbar.refresh()
 
     exist_keys, non_exist_keys = MySQL.page_info_exist(page_list,lang)
+    # print(len(exist_keys), len(non_exist_keys))
+
 
     # 50个一组
     bs = 20
-    for i in range(0, len(non_exist_keys), bs):
+    for i in tqdm(range(0, len(non_exist_keys), bs)):
         keys = non_exist_keys[i:i+bs]
         try:
             page_info_list = get_page_info(keys)

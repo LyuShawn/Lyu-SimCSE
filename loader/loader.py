@@ -74,8 +74,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
         if model_args.knowledge_enhancement:
             knowledge_list = retrieval_knowledge(examples[sent0_cname], 
-                                                retrieve_type=args.model_args.knowledge_retrieve_type,
-                                                max_length=data_args.max_seq_length)
+                                                retrieve_type=args.model_args.knowledge_retrieve_type)
 
         input_ids = []
         attention_mask = []
@@ -97,28 +96,34 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
 
                 knowledge = knowledge_list[i % total]
                 if knowledge:
+                    # 截断knowledge
+                    knowledge_tokens = tokenizer.tokenize(knowledge)[0:args.model_args.knowledge_max_length]
+                    knowledge = tokenizer.convert_tokens_to_string(knowledge_tokens)
                     template = prompt_template.format(knowledge=knowledge,sentence='{sentence}')
                 else:
                     template = model_args.eval_template
 
                 prompt_prefix = template.split('{sentence}')[0]
                 prompt_suffix = template.split('{sentence}')[1]
-                prompt_prefix_input_ids = tokenizer.encode(prompt_prefix,truncation=True,max_length=512-20-len(s))[:-1] 
-                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix,truncation=True,max_length=512-20-len(s))[1:]
+                prompt_prefix_input_ids = tokenizer.encode(prompt_prefix,truncation=True)[:-1] 
+                prompt_suffix_input_ids = tokenizer.encode(prompt_suffix,truncation=True)[1:]
 
                 if i < total:
                     # 不处理对齐，直接拼接
                     if model_args.knowledge_fusion_type == "knowledge_positive":
                         # eval_template中的句子和融入的知识做正样例
-                        input_ids.append(eval_prefix_input_ids + s + eval_suffix_input_ids)
+                        ii = eval_prefix_input_ids + s + eval_suffix_input_ids
                     elif model_args.knowledge_fusion_type == "self_positive":
-                        input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
+                        ii = prompt_prefix_input_ids + s + prompt_suffix_input_ids
                     else:
                         raise NotImplementedError
                 elif i < total*2:
-                    input_ids.append(prompt_prefix_input_ids + s + prompt_suffix_input_ids)
+                    ii = prompt_prefix_input_ids + s + prompt_suffix_input_ids
                 else:
                     raise NotImplementedError
+                if tokenizer.mask_token_id not in ii:
+                    raise Exception("prompt_suffix_input_ids should contain mask token")
+                input_ids.append(ii)
 
             else:
                 # prompt_bert
