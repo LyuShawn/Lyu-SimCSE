@@ -260,6 +260,7 @@ def cl_forward(cls,
         except AssertionError as e:
             print(z1.shape)
             print(z2.shape)
+            raise e
 
         outputs = outputs2
 

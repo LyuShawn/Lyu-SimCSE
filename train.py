@@ -210,7 +210,7 @@ def main():
     )
 
     # 将数据集按照指定的长度截断，可以排查问题
-    datasets["train"] = datasets["train"].select(range(340480, 440480))
+    # datasets["train"] = datasets["train"].select(range(340480, 440480))
 
     if training_args.do_train:
         # 准备训练数据
