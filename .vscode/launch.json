@@ -30,7 +30,7 @@
                 "--do_eval",
                 "--overwrite_cache",
                 "--do_prompt_enhancement",
-                // "--sample_data","10000",
+                "--sample_data","10000",
                 // "--batch_inner_shuffle",
                 // "--prompt_template", "This sentence of '{sentence}' means [MASK].",
                 "--prompt_template", "The phrase '{sentence}' may relate to {knowledge}, thus [MASK] is implied.",

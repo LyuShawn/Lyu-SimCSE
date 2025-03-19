@@ -244,7 +244,7 @@ def cl_forward(cls,
         )
         pooler_output1 = cls.pooler(attention_mask1, outputs1, input_ids1, cls.mask_token_id)
         z1 = cls.mlp(pooler_output1)    # (bs, hidden)
-        del input_ids1, attention_mask1, outputs1, pooler_output1
+        del input_ids1, attention_mask1, outputs1, pooler_output1, input_ids
         torch.cuda.empty_cache()
         outputs2 = encoder(
             input_ids=input_ids2,
