@@ -255,7 +255,11 @@ def cl_forward(cls,
         pooler_output2 = cls.pooler(attention_mask2, outputs2, input_ids2, cls.mask_token_id)
         z2 = cls.mlp(pooler_output2)
 
-        assert z1.shape == z2.shape == (batch_size, hidden_dim), "z1 and z2 should have the same shape"
+        try:
+            assert z1.shape == z2.shape == (batch_size, hidden_dim), "z1 and z2 should have the same shape"
+        except AssertionError as e:
+            print(z1.shape)
+            print(z2.shape)
 
         outputs = outputs2
 

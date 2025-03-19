@@ -82,7 +82,6 @@ def main():
         # 只有train所以只对train进行采样
         datasets["train"] = datasets["train"].select(range(data_args.sample_data))
         
-
     # 设置随机种子
     set_seed(training_args.seed)
 
@@ -154,6 +153,8 @@ def main():
     # 更新tokenizer的词表大小
     model.resize_token_embeddings(len(tokenizer))
 
+
+
     # 数据tokenize
     column_names = datasets["train"].column_names
     sent2_cname = None
@@ -207,6 +208,9 @@ def main():
         sent1_cname=sent1_cname,
         sent2_cname=sent2_cname
     )
+
+    # 将数据集按照指定的长度截断，可以排查问题
+    datasets["train"] = datasets["train"].select(range(340480, 440480))
 
     if training_args.do_train:
         # 准备训练数据
