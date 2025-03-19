@@ -144,19 +144,12 @@ def cl_forward(cls,
 ):
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
-    ori_input_ids = input_ids   # (bs, num_sent, len)
+    # ori_input_ids = input_ids   # (bs, num_sent, len)
     batch_size = input_ids.size(0)
     # Number of sentences in one instance
     # 2: pair instance; 3: pair instance with a hard negative
     num_sent = input_ids.size(1)
     hidden_dim = cls.config.hidden_size # hidden size of BERT/RoBERTa
-
-    mlm_outputs = None
-    # Flatten input for encoding
-    input_ids = input_ids.view((-1, input_ids.size(-1))) # (bs * num_sent, len)
-    attention_mask = attention_mask.view((-1, attention_mask.size(-1))) # (bs * num_sent len)
-    if token_type_ids is not None:
-        token_type_ids = token_type_ids.view((-1, token_type_ids.size(-1))) # (bs * num_sent, len)
 
     if category_input_ids:
         c_max_length = 64
@@ -237,24 +230,38 @@ def cl_forward(cls,
         del z1, z2, pooler_output
         torch.cuda.empty_cache()
 
-    # Get raw embeddings    (bs * num_sent, len, hidden)
-    outputs = encoder(
-        input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        position_ids=position_ids,
-        head_mask=head_mask,
-        inputs_embeds=inputs_embeds,
-        output_attentions=output_attentions,
-        output_hidden_states=True if cls.model_args.pooler_type in ['avg_top2', 'avg_first_last'] else False,
-        return_dict=True,
-    )
+    if cls.model_args.knowledge_enhancement:
+        # 如果使用了知识增强，那么需要输入不拉平，过两次encoder
+        input_ids1 = input_ids[:, 0]    # (bs, len)
+        input_ids2 = input_ids[:, 1]
+        attention_mask1 = attention_mask[:, 0]
+        attention_mask2 = attention_mask[:, 1]
+        # encoder
+        outputs1 = encoder(
+            input_ids=input_ids1,
+            attention_mask=attention_mask1,
+            return_dict=True,
+        )
+        pooler_output1 = cls.pooler(attention_mask1, outputs1, input_ids1, cls.mask_token_id)
+        z1 = cls.mlp(pooler_output1)    # (bs, hidden)
+        del input_ids1, attention_mask1, outputs1, pooler_output1
+        torch.cuda.empty_cache()
+        outputs2 = encoder(
+            input_ids=input_ids2,
+            attention_mask=attention_mask2,
+            return_dict=True,
+        )
+        pooler_output2 = cls.pooler(attention_mask2, outputs2, input_ids2, cls.mask_token_id)
+        z2 = cls.mlp(pooler_output2)
+        outputs = outputs2
 
-    # MLM auxiliary objective
-    if mlm_input_ids is not None:
-        mlm_input_ids = mlm_input_ids.view((-1, mlm_input_ids.size(-1)))
-        mlm_outputs = encoder(
-            mlm_input_ids,
+    else:
+        input_ids = input_ids.view((-1, input_ids.size(-1))) # (bs * num_sent, len)
+        attention_mask = attention_mask.view((-1, attention_mask.size(-1))) # (bs * num_sent len)
+
+        # Get raw embeddings    (bs * num_sent, len, hidden)
+        outputs = encoder(
+            input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -265,39 +272,33 @@ def cl_forward(cls,
             return_dict=True,
         )
 
-    # Pooling
-        
-    pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id)
+        # Pooling 
+        pooler_output = cls.pooler(attention_mask, outputs, input_ids, cls.mask_token_id)
+        assert pooler_output.shape == (batch_size * num_sent, hidden_dim)  # 优雅的assert张量形状
+        pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
+        pooler_output = cls.mlp(pooler_output)
+        if sent_knowledge:
 
-    assert pooler_output.shape == (batch_size * num_sent, hidden_dim)  # 优雅的assert张量形状
+            # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
+            if cls.knowledge_encoder is not None:
+                knowledge_output = cls.knowledge_encoder(
+                    **sent_knowledge,
+                    return_dict=True,
+                )
+            else:
+                knowledge_output = encoder(
+                    **sent_knowledge,
+                    return_dict=True,
+                )
 
-    pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
-
-    pooler_output = cls.mlp(pooler_output)
-
-    if sent_knowledge:
-
-        # 计算知识的表征，（bs,len,hidden）->(bs,hidden)
-        if cls.knowledge_encoder is not None:
-            knowledge_output = cls.knowledge_encoder(
-                **sent_knowledge,
-                return_dict=True,
-            )
-        else:
-            knowledge_output = encoder(
-                **sent_knowledge,
-                return_dict=True,
-            )
-
-        # 对knowledge_output进行pooling
-        # (bs, len, hidden) -> (bs, hidden)
-        knowledge_output = cls.pooler(attention_mask = sent_knowledge["attention_mask"], 
-                                    outputs = knowledge_output, 
-                                    input_ids = sent_knowledge["input_ids"], 
-                                    pooler_type = "mask",
-                                    mask_token_id = cls.mask_token_id)
-
-    z1, z2 = pooler_output[:,0], pooler_output[:,1]
+            # 对knowledge_output进行pooling
+            # (bs, len, hidden) -> (bs, hidden)
+            knowledge_output = cls.pooler(attention_mask = sent_knowledge["attention_mask"], 
+                                        outputs = knowledge_output, 
+                                        input_ids = sent_knowledge["input_ids"], 
+                                        pooler_type = "mask",
+                                        mask_token_id = cls.mask_token_id)
+        z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
     # Hard negative
     if num_sent == 3:
@@ -339,13 +340,6 @@ def cl_forward(cls,
     if cls.model_args.category_label:
         c_loss = loss_fct(c_cos_sim, labels)
         loss += cls.model_args.category_label_loss_weight * c_loss
-
-    # Calculate loss for MLM
-    if mlm_outputs is not None and mlm_labels is not None:
-        mlm_labels = mlm_labels.view(-1, mlm_labels.size(-1))
-        prediction_scores = cls.lm_head(mlm_outputs.last_hidden_state)
-        masked_lm_loss = loss_fct(prediction_scores.view(-1, cls.config.vocab_size), mlm_labels.view(-1))
-        loss = loss + cls.model_args.mlm_weight * masked_lm_loss
 
     if not return_dict:
         output = (cos_sim,) + outputs[2:]
