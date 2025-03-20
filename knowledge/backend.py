@@ -319,6 +319,16 @@ class MySQLClient(metaclass=SingletonMeta):
         cursor.close()
         return existing_keys, non_existing_keys
 
+    def batch_get_page_info_title_abstract(self, offset, limit=1000):
+        cursor = self.connection.cursor()
+        sql = """
+            SELECT page_id, title, abstract FROM t_page_info LIMIT %s, %s;
+            """
+        cursor.execute(sql, (offset, limit))
+        page_info_list = cursor.fetchall()
+        cursor.close()
+        return page_info_list
+
     def batch_insert_page_info(self, page_info_list,lang):
         """批量插入page相关的信息"""
         if not page_info_list:

@@ -132,7 +132,7 @@ dmypy.json
 # .vscode
 data/*
 !data/*.sh
-draw/data/
+draw/draw-data/
 result
 results
 .venv-cu11

@@ -10,7 +10,8 @@ WIKI_API = "https://en.wikipedia.org/w/api.php"
 
 total = MySQL.get_sent_page_in_page_id_num()
 pbar = tqdm(total=total)
-offset = random.randint(0,total)
+# offset = random.randint(0,total)
+offset = 0
 limit=  1000
 lang = 'en'
 
