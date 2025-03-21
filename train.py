@@ -66,7 +66,7 @@ def main():
         data_files["train"] = data_args.train_file
     # 都是txt，所以从网络直接加载
     HF_DATASET_NAME = "LyuShawn/Dataset-LyuCSE"
-    datasets = load_dataset(HF_DATASET_NAME, data_files=data_files)
+    datasets = load_dataset(HF_DATASET_NAME, data_files=data_files, trust_remote_code=True)
 
     if data_args.set_seed_before_shuffle:
         # 在shuffle之前设置随机种子，可以保证每次shuffle的结果一样
@@ -232,7 +232,7 @@ def main():
 
     if training_args.eval_dataset is not None:
         logger.info(f"********* Prepare Eval Dataset : {training_args.eval_dataset} *********")
-        eval_dataset = load_dataset(training_args.eval_dataset, name = training_args.eval_dataset_name)
+        eval_dataset = load_dataset(training_args.eval_dataset, name = training_args.eval_dataset_name, trust_remote_code=True)
     else:
         eval_dataset = None
 
