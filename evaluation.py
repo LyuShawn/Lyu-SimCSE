@@ -498,6 +498,18 @@ class EvaluationUtil:
             sent2_name = "sentence2"
             label_name = "similarity_score"
 
+        if "Biosses" in dataset_name:
+            # Biosses数据集
+            if mode == "test":
+                dataset = dataset["test"]
+            elif mode == "dev":
+                dataset = dataset["validation"]
+            else:
+                raise NotImplementedError
+            sent1_name = "sentence1"
+            sent2_name = "sentence2"
+            label_name = "score"
+
         else:
             raise NotImplementedError
 
