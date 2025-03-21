@@ -55,7 +55,7 @@ def main(args):
 
     # 采样
     logging.info(f"sent_cnt: {sent_cnt}")
-    if sent_cnt > sent_num:
+    if sent_num != -1 and sent_num < sent_cnt:
         sent_list = random.sample(sent_list, sent_num)
     # 写入文件
     logging.info(f"writing to {output_file}")
@@ -63,14 +63,12 @@ def main(args):
         for sent in sent_list:
             f.write(sent + "\n")
     logging.info("done")
-        
-        
             
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", type=str, default="Medicine")
-    parser.add_argument("--sent_num", type=int, default=1_000_000)
+    parser.add_argument("--sent_num", type=int, default=1_000_000)  # -1时不采样
     parser.add_argument("--max_sent_num", type=int, default=-1) # 限制最大句子数
     parser.add_argument("--output_file", type=str, default="data/wiki_corpus.txt")
     parser.add_argument("--seed", type=int, default=0)
