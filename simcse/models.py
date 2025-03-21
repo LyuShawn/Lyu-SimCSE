@@ -451,7 +451,12 @@ class BertForCL(BertPreTrainedModel):
     def __init__(self, config, *model_args, **model_kargs):
         super().__init__(config)
         self.model_args = model_kargs["model_args"]
-        self.bert = BertModel(config, add_pooling_layer=False)
+    
+        try:
+            self.bert = BertModel(config, add_pooling_layer=False)
+        except:
+            from transformers.models.mpnet.modeling_mpnet import MPNetModel
+            self.bert = MPNetModel(config, add_pooling_layer=False)
 
         if self.model_args.do_mlm:
             self.lm_head = BertLMPredictionHead(config)

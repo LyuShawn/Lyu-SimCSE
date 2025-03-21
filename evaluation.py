@@ -414,7 +414,7 @@ class EvaluationUtil:
         def sent_tokenize(examples):
             total = len(examples[sent1_name])
             sentences = examples[sent1_name] + examples[sent2_name]
-            sent_features = tokenizer(sentences, return_tensors="pt", padding=True, truncation=False)
+            sent_features = tokenizer(sentences, return_tensors="pt", padding='longest', truncation=True, max_length=512)
             features = {}
             for key in sent_features:
                 features[key] = [[sent_features[key][i], sent_features[key][i+total]] for i in range(total)]
@@ -533,6 +533,17 @@ class EvaluationUtil:
             sent1_name = "text_1"
             sent2_name = "text_2"
             label_name = "label"
+
+        elif "FinSTS" in dataset_name:
+            if mode == "test":
+                dataset = dataset["test"]
+            elif mode == "dev":
+                dataset = dataset["validation"]
+            else:
+                raise NotImplementedError
+            sent1_name = "sentence1"
+            sent2_name = "sentence2"
+            label_name = "score"
 
         else:
             raise NotImplementedError
