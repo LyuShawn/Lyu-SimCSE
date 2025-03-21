@@ -16,6 +16,7 @@ from mteb.encoder_interface import PromptType
 from typing import Optional
 import mteb
 from mteb.task_selection import results_to_dataframe
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 PATH_TO_SENTEVAL = './SentEval'
 PATH_TO_DATA = './SentEval/data'
@@ -98,7 +99,7 @@ class EvaluationUtil:
     dev_sts_task_list = ["STSBenchmark", "SICKRelatedness"]
     dev_transfer_task_list = transfer_task_list
 
-    def __init__(self, path, model_args, task_set="sts", mode="test",mteb_task_set=None, dataset=None, dataset_name=None, *args ,**kwargs):
+    def __init__(self, path, model_args, task_set="sts", mode="test",metric="spearman",mteb_task_set=None, dataset=None, dataset_name=None, *args ,**kwargs):
         """数据准备"""
         logging.basicConfig(
             level=logging.INFO,
@@ -110,6 +111,7 @@ class EvaluationUtil:
 
         self.model_args = model_args
         self.task_set = task_set
+        self.metric = metric
 
         self.print_table_switch = False if not kwargs.get("print_table", None) else kwargs.get("print_table")
 
@@ -187,13 +189,6 @@ class EvaluationUtil:
                 tasks = mteb.get_tasks(tasks=self.tasks)
                 evaluation = mteb.MTEB(tasks=tasks)
                 results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
-                # result = results[0]
-                # scores = result.scores["test"]
-                # print(scores)
-                # # 计算平均值
-                # sum_score = sum([score['main_score'] for score in scores])
-                # mean_score = sum_score / len(scores)
-                # print(f"Mean score: {mean_score}")
                 result_list = [result.to_dict() for result in results]
                 return result_list
             else:
@@ -208,8 +203,9 @@ class EvaluationUtil:
                         dataset=self.dataset,
                         dataset_name=self.dataset_name,
                         mode = self.mode,
+                        metric=self.metric,
                     )
-                    result['avg'] = result['spearman']
+                    result['avg'] = result[self.metric]
                 else:
                     result = self.eval_core(
                         model=model,
@@ -406,7 +402,7 @@ class EvaluationUtil:
         return params
 
     @classmethod
-    def eval_by_dataset_core(cls, model, tokenizer,dataset, sent1_name, sent2_name, label_name, bs=64):
+    def eval_by_dataset_core(cls, model, tokenizer,dataset, sent1_name, sent2_name, label_name, bs=64, metric="spearman"):
         """评估核心，与senteval不同的是，这里是自己控制数据集
         评估由自己写
         """
@@ -474,16 +470,32 @@ class EvaluationUtil:
             cos_sim_list.extend(cos_sim.tolist())
         assert len(cos_sim_list) == len(dataset), f"cos_sim_list:{len(cos_sim_list)}, dataset:{len(dataset)}"
 
-        # 计算spearman相关系数和pearson相关系数
-        label_list = np.array(dataset[label_name])
-        # label除5
-        cos_sim_list = np.array(cos_sim_list)
-        spearman_corr, _ = spearmanr(cos_sim_list, label_list)
-        pearson_corr, _ = pearsonr(cos_sim_list, label_list)
-        return {"spearman": spearman_corr, "pearson": pearson_corr}
+        if metric == "spearman":
+            # 计算spearman相关系数和pearson相关系数
+            label_list = np.array(dataset[label_name])
+            cos_sim_list = np.array(cos_sim_list)
+            spearman_corr, _ = spearmanr(cos_sim_list, label_list)
+            pearson_corr, _ = pearsonr(cos_sim_list, label_list)
+            return {"spearman": spearman_corr, "pearson": pearson_corr}
+
+        elif metric == "accuracy":
+            cos_sim_list = np.array(cos_sim_list)
+            cos_sim_list = cos_sim_list > 0.5
+
+            label_list = np.array(dataset[label_name])
+            label_list = np.vectorize(lambda x: x == 'true')(label_list)    # 转换为bool
+
+            acc = accuracy_score(label_list, cos_sim_list)
+            precision = precision_score(label_list, cos_sim_list)
+            recall = recall_score(label_list, cos_sim_list)
+            f1 = f1_score(label_list, cos_sim_list)
+            return {"accuracy": acc, "precision": precision, "recall": recall, "f1": f1}
+
+        else:
+            raise NotImplementedError
 
     @classmethod
-    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=64):
+    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=64,metric="spearman"):
         """自己控制数据集"""
         # 判断数据集名称切分
         if "stsb_multi_mt" in dataset_name:
@@ -510,11 +522,23 @@ class EvaluationUtil:
             sent2_name = "sentence2"
             label_name = "score"
 
+        if "mediqa" in dataset_name:
+            # mediqa数据集
+            if mode == "test":
+                dataset = dataset["test"]
+            elif mode == "dev":
+                dataset = dataset["validation"]
+            else:
+                raise NotImplementedError
+            sent1_name = "text_1"
+            sent2_name = "text_2"
+            label_name = "label"
+
         else:
             raise NotImplementedError
 
         # 按照batch_size处理数据
-        return cls.eval_by_dataset_core(model,tokenizer , dataset, sent1_name, sent2_name, label_name, bs=bs)
+        return cls.eval_by_dataset_core(model,tokenizer , dataset, sent1_name, sent2_name, label_name, bs=bs, metric=metric)
 
         
 

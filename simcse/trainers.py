@@ -24,6 +24,7 @@ class CLTrainer(Trainer):
                 dataset = self.eval_dataset,
                 dataset_name=dataset_name,
                 mode = "dev",
+                metric = self.args.metric_for_best_model,
             )
             metrics = {}
             for key in results:

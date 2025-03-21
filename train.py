@@ -272,7 +272,12 @@ def main():
     if training_args.do_eval:
 
         logger.info(f"*** Evaluate ***")
-        eval_util = EvaluationUtil(path = training_args.output_dir, model_args = model_args, print_table=True, dataset=eval_dataset, dataset_name=training_args.eval_dataset)
+        eval_util = EvaluationUtil(path = training_args.output_dir, 
+                                model_args = model_args, 
+                                print_table=True, 
+                                dataset=eval_dataset, 
+                                dataset_name=training_args.eval_dataset,
+                                metric=training_args.metric_for_best_model,)
         results, result_file_path = eval_util.eval()
         wandb.log(results)
         wandb.log({"score_file": wandb.save(result_file_path)})
