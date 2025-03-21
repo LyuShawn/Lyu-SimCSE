@@ -15,9 +15,9 @@ class CLTrainer(Trainer):
 
         self.model.eval()
 
-        if self.eval_dataset is not None:
+        if self.eval_dataset is not None or self.args.mteb:
             # 使用传入的eval_dataset
-            dataset_name = self.args.eval_dataset
+            dataset_name = self.args.eval_dataset_name
             results = EvaluationUtil.eval_by_dataset(
                 model=self.model,
                 tokenizer=self.tokenizer,
@@ -25,6 +25,7 @@ class CLTrainer(Trainer):
                 dataset_name=dataset_name,
                 mode = "dev",
                 metric = self.args.metric_for_best_model,
+                use_mteb = self.args.mteb,
             )
             metrics = {}
             for key in results:

@@ -459,6 +459,11 @@ class OurTrainingArguments(TrainingArguments):
         metadata={"help": "The evaluation dataset name."},
     )
 
+    mteb: bool = field(
+        default=False,
+        metadata={"help": "Whether to use mteb."},
+    )
+
     # 设置torch
     def __post_init__(self):
 

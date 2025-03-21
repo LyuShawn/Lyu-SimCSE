@@ -25,19 +25,19 @@ sys.path.insert(0, PATH_TO_SENTEVAL)
 import senteval
 
 class CustomMtebModel:
-    def __init__(self, model_name, pooler='cls'):
+    def __init__(self, model_name, pooler='cls',model=None,tokenizer=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        if "msimcse" in model_name:
-            self.tokenizer = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large")
-        else:
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         load_args = {}
         if pooler in ['avg_top2', 'avg_first_last']:
             load_args = {'output_hidden_states': True}
 
-        self.model = AutoModel.from_pretrained(model_name,**load_args).to(self.device)
+        if "msimcse" in model_name:
+            self.tokenizer = tokenizer if tokenizer else AutoTokenizer.from_pretrained(model_name, use_fast=False)
+        else:
+            self.tokenizer = tokenizer if tokenizer else AutoTokenizer.from_pretrained(model_name)
+
+        self.model = model if model else AutoModel.from_pretrained(model_name, **load_args).to(self.device)
 
         self.pooler = Pooler(pooler)
         self.model_name = model_name
@@ -71,15 +71,19 @@ class CustomMtebModel:
             total = len(sentences)
             for i in tqdm(range(0, total, batch_size), desc="Encoding"):
                 batch = sentences[i:i+batch_size]
-                inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors='pt',max_length=512).to(self.device)
+                inputs = self.tokenizer(batch, padding="longest", truncation=True, return_tensors='pt',max_length=512).to(self.device)
                 with torch.no_grad():
-                    outputs = self.model(**inputs)
+                    if self.model_name =='tmp':
+                        outputs = self.model(**inputs,sent_emb=True)
+                    else:
+                        outputs =self.model(**inputs)
                     pooler_output = self.pooler(**inputs, outputs=outputs)
                 if i == 0:
                     all_embeddings = pooler_output
                 else:
                     all_embeddings = torch.cat((all_embeddings, pooler_output), dim=0)
             return all_embeddings.cpu().numpy()
+
 
 lang_list = 'ar he vi id jv tl eu ml ta te af nl de el bn hi mr ur fa fr it pt es bg ru ja ka ko th sw zh kk tr et fi hu az lt pl uk ro'.split()
 lang_list14 = 'ar bg zh de el fr hi ru es sw th tr ur vi'.split()
@@ -495,8 +499,25 @@ class EvaluationUtil:
             raise NotImplementedError
 
     @classmethod
-    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=64,metric="spearman"):
+    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=64,metric="spearman", use_mteb=False):
         """自己控制数据集"""
+
+        if use_mteb:
+            task_name = dataset_name
+
+            if task_name == "ChemHotpotQARetrieval":
+                tasks = mteb.get_tasks(tasks=["ChemHotpotQARetrieval"],eval_splits=[mode])
+
+                model = CustomMtebModel(model_name="tmp", model=model,tokenizer=tokenizer)
+
+                evaluation = mteb.MTEB(tasks=tasks)
+                results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
+                result_list = [result.to_dict() for result in results]
+                return result_list[0]['scores'][mode][0]
+
+            else:
+                raise NotImplementedError
+
         # 判断数据集名称切分
         if "stsb_multi_mt" in dataset_name:
             # 多语言stsb数据集，切出dev数据集
