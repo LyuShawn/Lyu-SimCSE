@@ -510,7 +510,7 @@ class EvaluationUtil:
             sent2_name = "sentence2"
             label_name = "similarity_score"
 
-        if "Biosses" in dataset_name:
+        elif "Biosses" in dataset_name:
             # Biosses数据集
             if mode == "test":
                 dataset = dataset["test"]
@@ -522,7 +522,7 @@ class EvaluationUtil:
             sent2_name = "sentence2"
             label_name = "score"
 
-        if "mediqa" in dataset_name:
+        elif "mediqa" in dataset_name:
             # mediqa数据集
             if mode == "test":
                 dataset = dataset["test"]
