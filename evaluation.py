@@ -499,7 +499,7 @@ class EvaluationUtil:
             raise NotImplementedError
 
     @classmethod
-    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=64,metric="spearman", use_mteb=False):
+    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=256,metric="spearman", use_mteb=False):
         """自己控制数据集"""
 
         if use_mteb:
