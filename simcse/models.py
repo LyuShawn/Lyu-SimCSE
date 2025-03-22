@@ -361,7 +361,7 @@ def cl_forward(cls,
                                         mask_token_id = cls.mask_token_id)
         z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
-    if cls.model_args.multi_lang:
+    if cls.model_args.multi_lang and cls.model_args.multi_lang_loss_type:
         assert input_ids.shape == (batch_size * num_sent, input_ids.size(-1))
         # 取一半
         input_ids = input_ids.view((batch_size, num_sent, input_ids.size(-1)))[:,0]
