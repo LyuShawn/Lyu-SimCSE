@@ -147,3 +147,5 @@ model/
 cache/
 
 Dataset-LyuCSE/
+
+tmp_result.json

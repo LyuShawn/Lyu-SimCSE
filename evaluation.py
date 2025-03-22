@@ -33,11 +33,13 @@ class CustomMtebModel:
             load_args = {'output_hidden_states': True}
 
         if "msimcse" in model_name:
-            self.tokenizer = tokenizer if tokenizer else AutoTokenizer.from_pretrained(model_name, use_fast=False)
+            # msimcse没有给词表，与xlmr共用
+            self.tokenizer = tokenizer if tokenizer else AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large")
         else:
             self.tokenizer = tokenizer if tokenizer else AutoTokenizer.from_pretrained(model_name)
 
-        self.model = model if model else AutoModel.from_pretrained(model_name, **load_args).to(self.device)
+        self.model = model if model else AutoModel.from_pretrained(model_name, **load_args)
+        self.model = self.model.to(self.device)
 
         self.pooler = Pooler(pooler)
         self.model_name = model_name
@@ -73,7 +75,7 @@ class CustomMtebModel:
                 batch = sentences[i:i+batch_size]
                 inputs = self.tokenizer(batch, padding="longest", truncation=True, return_tensors='pt',max_length=512).to(self.device)
                 with torch.no_grad():
-                    if self.model_name =='tmp':
+                    if self.model_name =='sent_emb':
                         outputs = self.model(**inputs,sent_emb=True)
                     else:
                         outputs =self.model(**inputs)
@@ -86,8 +88,18 @@ class CustomMtebModel:
 
 
 lang_list = 'ar he vi id jv tl eu ml ta te af nl de el bn hi mr ur fa fr it pt es bg ru ja ka ko th sw zh kk tr et fi hu az lt pl uk ro'.split()
-lang_list14 = 'ar bg zh de el fr hi ru es sw th tr ur vi'.split()
-lang_list36 = 'af bn et eu fi he hu id it jv ja ka kk ko ml mr nl fa pt ta te tl'.split()
+lang3_dict = {'ara':'ar', 'heb':'he', 'vie':'vi', 'ind':'id',
+    'jav':'jv', 'tgl':'tl', 'eus':'eu', 'mal':'ml', 'tam':'ta',
+    'tel':'te', 'afr':'af', 'nld':'nl', 'eng':'en', 'deu':'de',
+    'ell':'el', 'ben':'bn', 'hin':'hi', 'mar':'mr', 'urd':'ur',
+    'tam':'ta', 'fra':'fr', 'ita':'it', 'por':'pt', 'spa':'es',
+    'bul':'bg', 'rus':'ru', 'jpn':'ja', 'kat':'ka', 'kor':'ko',
+    'tha':'th', 'swh':'sw', 'cmn':'zh', 'kaz':'kk', 'tur':'tr',
+    'est':'et', 'fin':'fi', 'hun':'hu', 'pes':'fa', 'aze': 'az',
+    'lit': 'lt','pol': 'pl', 'ukr': 'uk', 'ron': 'ro'}
+lang_list14 = ['ara', 'bul', 'cmn', 'deu', 'ell', 'fra', 'hin', 'rus', 'spa', 'swh', 'tha', 'tur', 'urd', 'vie']
+lang_list36 = lang_list14 + ['afr', 'ben', 'est', 'eus', 'fin', 'heb', 'hun', 'ind', 'ita', 'jav', 'jpn', 'kat', 'kaz', 'kor', 'mal', 'mar', 'nld', 'pes', 'por', 'tam', 'tel', 'tgl']
+
 class EvaluationUtil:
 
     sts_task_list =[
@@ -103,7 +115,7 @@ class EvaluationUtil:
     dev_sts_task_list = ["STSBenchmark", "SICKRelatedness"]
     dev_transfer_task_list = transfer_task_list
 
-    def __init__(self, path, model_args, task_set="sts", mode="test",metric="spearman",mteb_task_set=None, dataset=None, dataset_name=None, *args ,**kwargs):
+    def __init__(self, path, model_args,bs=128, task_set="sts", mode="test",metric="spearman",mteb_task_set=None, dataset=None, dataset_name=None, *args ,**kwargs):
         """数据准备"""
         logging.basicConfig(
             level=logging.INFO,
@@ -116,6 +128,7 @@ class EvaluationUtil:
         self.model_args = model_args
         self.task_set = task_set
         self.metric = metric
+        self.bs = bs
 
         self.print_table_switch = False if not kwargs.get("print_table", None) else kwargs.get("print_table")
 
@@ -190,11 +203,8 @@ class EvaluationUtil:
 
             if self.task_set == "mteb":
                 model = CustomMtebModel(path, pooler=self.pooler_type)
-                tasks = mteb.get_tasks(tasks=self.tasks)
-                evaluation = mteb.MTEB(tasks=tasks)
-                results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
-                result_list = [result.to_dict() for result in results]
-                return result_list
+                return self.eval_by_mteb(task_name=self.tasks, model=model, bs=self.bs,mode=self.mode)
+
             else:
                 model = AutoModel.from_pretrained(path).to(self.device)
                 tokenizer = AutoTokenizer.from_pretrained(path)
@@ -499,24 +509,58 @@ class EvaluationUtil:
             raise NotImplementedError
 
     @classmethod
+    def eval_by_mteb(cls,task_name,model,bs,mode='test'):
+
+        if task_name[0] == "ChemHotpotQARetrieval":
+            tasks = mteb.get_tasks(tasks=["ChemHotpotQARetrieval"],eval_splits=[mode])
+
+            evaluation = mteb.MTEB(tasks=tasks)
+            results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
+            result_list = [result.to_dict() for result in results]
+            return result_list[0]['scores'][mode]
+
+        elif task_name[0] == "BUCC.v2":
+            tasks = mteb.get_tasks(tasks=["BUCC.v2"],eval_splits=[mode])
+            evaluation = mteb.MTEB(tasks=tasks)
+            results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
+            result_list = [result.to_dict() for result in results]
+            return result_list[0]['scores'][mode]
+
+        elif task_name[0].startswith("Tatoeba"):
+            lang_list = None
+            if task_name[0] == "Tatoeba.14":
+                lang_list = lang_list14
+                tasks = mteb.get_tasks(tasks=["Tatoeba"],eval_splits=[mode],languages=lang_list14)
+            elif task_name[0] == "Tatoeba.36":
+                lang_list = lang_list36
+                tasks = mteb.get_tasks(tasks=["Tatoeba"],eval_splits=[mode],languages=lang_list36)
+            else:
+                tasks =  mteb.get_tasks(tasks=["Tatoeba"],eval_splits=[mode])
+            evaluation = mteb.MTEB(tasks=tasks)
+            results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": bs})
+            result_list = [result.to_dict() for result in results]
+            result = result_list[0]['scores'][mode]
+            if lang_list:
+                # 过滤
+                result = [r for r in result if r['hf_subset'].split('-')[0] in lang_list]
+            avg = sum(r['main_score'] for r in result)/len(result)
+            return {'avg': avg, 'result':result}
+
+        else:
+            tasks = mteb.get_tasks(tasks=task_name)
+            evaluation = mteb.MTEB(tasks=tasks)
+            results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": bs})
+            result_list = [result.to_dict() for result in results]
+            return result_list
+
+    @classmethod
     def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=256,metric="spearman", use_mteb=False):
         """自己控制数据集"""
 
         if use_mteb:
-            task_name = dataset_name
-
-            if task_name == "ChemHotpotQARetrieval":
-                tasks = mteb.get_tasks(tasks=["ChemHotpotQARetrieval"],eval_splits=[mode])
-
-                model = CustomMtebModel(model_name="tmp", model=model,tokenizer=tokenizer)
-
-                evaluation = mteb.MTEB(tasks=tasks)
-                results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
-                result_list = [result.to_dict() for result in results]
-                return result_list[0]['scores'][mode][0]
-
-            else:
-                raise NotImplementedError
+            task_name = dataset_name.split(',')
+            model = CustomMtebModel(model_name="tmp", model=model,tokenizer=tokenizer)
+            return cls.eval_by_mteb(task_name=task_name,model=model,bs=bs,mode=mode)
 
         # 判断数据集名称切分
         if "stsb_multi_mt" in dataset_name:
@@ -582,7 +626,12 @@ def main():
     eval_util = EvaluationUtil(**eval_args.__dict__, model_args=model_args)
 
     result = eval_util.eval()
-    print(json.dumps(result, indent=4, ensure_ascii=False))
+    # print(json.dumps(result, indent=4, ensure_ascii=False))
+    output_file = 'tmp_result.json'
+    with open(output_file, 'w') as f:
+        json.dump(result, f, indent=4)
+    print(f"Result has been saved to {output_file}")
+    print(f"avg:{result['avg']}")
 
 
 if __name__ == "__main__":

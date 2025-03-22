@@ -68,9 +68,9 @@
             "program": "${workspaceFolder}/evaluation.py",
             "console": "integratedTerminal",
             "args": [
-                "--path", "kamalkraj/BioSimCSE-BioLinkBERT-BASE", 
+                "--path", "FacebookAI/xlm-roberta-large", 
                 "--task_set","mteb",
-                "--mteb_task_set", "BIOSSES"
+                "--mteb_task_set", "Tatoeba.v14"
                 // "--pooler_type", "mask","--eval_template", "This sentence of '{sentence}' means [MASK].","--do_prompt_enhancement"
                 // "--path", "model/unsup-simcse-bert-base-uncased/", "--task_set","transfer"
             ],

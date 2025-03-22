@@ -535,3 +535,8 @@ class EvalArguments:
         default=False,
         metadata={"help": "Print table."},
     )
+
+    bs:int = field(
+        default=128,
+    )
+

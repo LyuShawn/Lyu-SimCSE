@@ -1,79 +1,22 @@
-# 
-import requests
-from tqdm import tqdm
-from knowledge.backend import MySQLClient
-import random
+# 评估
+from transformers import AutoTokenizer,AutoModel
+from datasets import load_dataset
+import torch
+from evaluation import EvaluationUtil
+import json
 
-MySQL = MySQLClient()
+model_name = "model/msimcse-xlm-roberta-large-cross_all/"
 
-WIKI_API = "https://en.wikipedia.org/w/api.php"
+tokenizer = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large")
+model = AutoModel.from_pretrained(model_name)
 
-total = MySQL.get_sent_page_in_page_id_num()
-pbar = tqdm(total=total)
-# offset = random.randint(0,total)
-offset = 0
-limit=  1000
-lang = 'en'
+dataset_name = "mteb/stsb_multi_mt"
+dataset = load_dataset(dataset_name, name="default")
 
-def get_page_info(page_id_list):
-    
-    page_id_list = [str(page_id) for page_id in page_id_list]
+result = EvaluationUtil.eval_by_dataset(model=model, tokenizer=tokenizer, dataset=dataset, dataset_name="Tatoeba.36", mode="test", bs=128,use_mteb=True)
 
-    params = {
-            "action": "query",
-            "pageids": "|".join(page_id_list),         # 指定页面ID
-            "prop": "info|categories|extracts",  # 同时获取基础信息和分类数据
-            "format": "json",           # 返回JSON格式
-            "inprop": "url",            # 包含页面URL信息[[23]]
-            "cllimit": "max",           # 获取最多500个分类（API限制）[[4,23]]
-            "clshow": "!hidden",        # 排除隐藏分类[[23]]
-            "exintro": True,         # 仅提取页面的简介
-            "explaintext": True,     # 返回纯文本，不包含HTML
-        }
-
-    response = requests.get(WIKI_API, params=params, timeout=10)
-    data = response.json()
-    page_info_list = []
-    if 'query' in data and 'pages' in data['query']:
-        pages = data['query']['pages']
-        for page in pages.values():
-            page_info = {}
-            page_info['page_id'] = page.get("pageid")
-            page_info['title'] = page.get('title')
-            page_info['full_url'] = page.get('fullurl')
-
-            category_list = page.get('categories', [])
-            page_info['categories'] = '|'.join([category['title'] for category in category_list])
-            page_info['abstract'] = page.get('extract', '')
-
-            page_info_list.append(page_info)
-    return page_info_list
-
-while True:
-    page_list = MySQL.batch_get_sent_page_in_page_id(offset,limit=limit)
-
-    page_info_size = MySQL.get_page_info_size()
-
-    if page_info_size >= total:
-        print('done')
-        break
-    if not page_list:
-        offset = random.randint(0,total)
-    offset += limit
-    pbar.n = page_info_size
-    pbar.refresh()
-
-    exist_keys, non_exist_keys = MySQL.page_info_exist(page_list,lang)
-    # print(len(exist_keys), len(non_exist_keys))
-
-
-    # 50个一组
-    bs = 20
-    for i in tqdm(range(0, len(non_exist_keys), bs)):
-        keys = non_exist_keys[i:i+bs]
-        try:
-            page_info_list = get_page_info(keys)
-            MySQL.batch_insert_page_info(page_info_list, lang)
-        except Exception as e:  # 有可能是网络问题
-            print(e)
-            continue
+output_file = 'tmp_result.json'
+with open(output_file, 'w') as f:
+    json.dump(result, f, indent=4)
+print(f"Result has been saved to {output_file}")
+print(f"avg:{result['avg']}")
