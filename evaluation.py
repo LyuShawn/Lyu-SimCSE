@@ -627,12 +627,16 @@ def main():
     eval_util = EvaluationUtil(**eval_args.__dict__, model_args=model_args)
 
     result = eval_util.eval()
-    # print(json.dumps(result, indent=4, ensure_ascii=False))
-    output_file = 'tmp_result.json'
+    # 生成随机文件名
+    random_string = ''.join(random.choices(string.ascii_letters, k=5))
+    output_file = f"eval_result_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+    output_dir = 'results/'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_file = os.path.join(output_dir, output_file)
     with open(output_file, 'w') as f:
         json.dump(result, f, indent=4)
     print(f"Result has been saved to {output_file}")
-    # print(f"avg:{result['avg']}")
 
 
 if __name__ == "__main__":
