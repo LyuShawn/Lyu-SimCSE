@@ -17,7 +17,7 @@ class CLTrainer(Trainer):
 
         if self.eval_dataset is not None or self.args.mteb:
             # 使用传入的eval_dataset
-            dataset_name = self.args.eval_dataset_name
+            dataset_name = self.args.eval_dataset
             results = EvaluationUtil.eval_by_dataset(
                 model=self.model,
                 tokenizer=self.tokenizer,

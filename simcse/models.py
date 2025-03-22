@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 
 import transformers
-from transformers import RobertaTokenizer
+from transformers import RobertaTokenizer,AutoTokenizer,AutoModel
 from transformers.models.roberta.modeling_roberta import RobertaPreTrainedModel, RobertaModel, RobertaLMHead
 from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertModel, BertLMPredictionHead
 from transformers.activations import gelu
@@ -14,6 +14,7 @@ from transformers.file_utils import (
     add_start_docstrings_to_model_forward,
     replace_return_docstrings,
 )
+from collections import defaultdict
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
 class MLPLayer(nn.Module):
@@ -45,6 +46,52 @@ class Similarity(nn.Module):
     def forward(self, x, y):
         return self.cos(x, y) / self.temp
 
+
+class MultiLangTeacher(nn.Module):
+    def __init__(self, lang_list:str, lang_model_dir, pooler):
+        super(MultiLangTeacher, self).__init__()
+        self.lang_list = lang_list.split(',')
+        self.pooler = pooler
+        assert self.lang_list, lang_model_dir
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # 加载各个教师模型
+        teacher_models = {}
+        teacher_tokenizers = {}
+        for lang in self.lang_list:
+            lang_model_path = lang_model_dir.format(lang=lang)
+            teacher_models[lang] = AutoModel.from_pretrained(lang_model_path).to(device)
+            # teacher_tokenizers[lang] = AutoTokenizer.from_pretrained(lang_model_path)
+        self.teacher_models = teacher_models
+        # self.teacher_tokenizers = teacher_tokenizers
+
+    def forward(self, input_ids, attention_mask, lang_label):
+        # input_ids: (bs, len)
+        # lang_label: (bs, )
+        batch_size = input_ids.size(0)
+        lang_groups = defaultdict(list)
+        for idx, lang in enumerate(lang_label):
+            lang_groups[lang].append(idx)
+        teacher_outputs = [None] * batch_size
+        with torch.no_grad():
+
+            for lang, indices in lang_groups.items():
+                # Get the corresponding inputs for the current language
+                lang_input_ids = input_ids[indices]
+                lang_attention_mask = attention_mask[indices]
+                # Check that the language is in the allowed list
+                if lang not in self.lang_list:  
+                    lang = self.lang_list[0]  # Default to the first language
+
+                output = self.teacher_models[lang](input_ids=lang_input_ids, attention_mask=lang_attention_mask, return_dict=True)
+                pooler_output = self.pooler(lang_attention_mask, output, lang_input_ids)
+                assert pooler_output.shape == (len(indices), self.teacher_models[lang].config.hidden_size)
+
+                for i, idx in enumerate(indices):
+                    teacher_outputs[idx] = pooler_output[i]
+        teacher_outputs = torch.stack(teacher_outputs)
+        assert teacher_outputs.shape[0] == batch_size
+        return teacher_outputs
 
 class Pooler(nn.Module):
     """
@@ -123,6 +170,9 @@ def cl_init(cls, config):
     cls.sim = Similarity(temp=cls.model_args.temp)
     cls.knowledge_sim = Similarity(temp=cls.model_args.knowledge_temp)
 
+    if cls.model_args.multi_lang:
+        cls.teacher = MultiLangTeacher(cls.model_args.lang_list, cls.model_args.lang_model_dir, cls.pooler)
+
     cls.init_weights()
 
 def cl_forward(cls,
@@ -141,6 +191,7 @@ def cl_forward(cls,
     mlm_labels=None,
     sent_knowledge=None,
     category_input_ids=None,
+    lang_label=None,
 ):
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
@@ -310,13 +361,25 @@ def cl_forward(cls,
                                         mask_token_id = cls.mask_token_id)
         z1, z2 = pooler_output[:,0], pooler_output[:,1]
 
-    # Hard negative
-    if num_sent == 3:
-        z3 = pooler_output[:, 2]
+    if cls.model_args.multi_lang:
+        assert input_ids.shape == (batch_size * num_sent, input_ids.size(-1))
+        # 取一半
+        input_ids = input_ids.view((batch_size, num_sent, input_ids.size(-1)))[:,0]
+        attention_mask = attention_mask.view((batch_size, num_sent, attention_mask.size(-1)))[:,0]
+        # label取奇数
+        lang_label = lang_label[::2]
+        teacher_output = cls.teacher(input_ids,attention_mask,lang_label)
+        assert teacher_output.shape == (batch_size, hidden_dim)
+
+        if cls.model_args.multi_lang_loss_type == "self":
+            z2 = teacher_output
+        elif cls.model_args.multi_lang_loss_type == "hard":
+            # Hard negative
+            z3 = teacher_output
 
     cos_sim = cls.sim(z1.unsqueeze(1), z2.unsqueeze(0))
-    # Hard negative
-    if num_sent >= 3:
+    
+    if cls.model_args.multi_lang_loss_type == "hard":
         z1_z3_cos = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
         cos_sim = torch.cat([cos_sim, z1_z3_cos], 1)
 
@@ -324,7 +387,7 @@ def cl_forward(cls,
     loss_fct = nn.CrossEntropyLoss()
 
     # Calculate loss with hard negatives
-    if num_sent == 3:
+    if cls.model_args.multi_lang_loss_type == "hard":
         # Note that weights are actually logits of weights
         z3_weight = cls.model_args.hard_negative_weight
         weights = torch.tensor(
@@ -485,6 +548,7 @@ class BertForCL(BertPreTrainedModel):
         mlm_labels=None,
         sent_knowledge=None,
         category_input_ids=None,
+        lang_label=None,
     ):
         if sent_emb:
             return sentemb_forward(self, self.bert,
@@ -515,8 +579,8 @@ class BertForCL(BertPreTrainedModel):
                 mlm_labels=mlm_labels,
                 sent_knowledge=sent_knowledge,
                 category_input_ids=category_input_ids,
+                lang_label=lang_label,
             )
-
 
 
 class RobertaForCL(RobertaPreTrainedModel):
@@ -547,6 +611,7 @@ class RobertaForCL(RobertaPreTrainedModel):
         mlm_input_ids=None,
         mlm_labels=None,
         category_input_ids=None,
+        lang_label=None,
     ):
         if sent_emb:
             return sentemb_forward(self, self.roberta,
@@ -576,4 +641,5 @@ class RobertaForCL(RobertaPreTrainedModel):
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
                 category_input_ids=category_input_ids,
+                lang_label=lang_label,
             )

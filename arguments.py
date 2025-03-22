@@ -268,6 +268,29 @@ class ModelArguments:
         }
     )
 
+    multi_lang: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use multi language."
+        }
+    )
+
+    lang_list: str = field(
+        default="en",
+        metadata={
+            "help": "The language list."
+        }
+    )
+
+    lang_model_dir: str = field(
+        default="",
+        metadata={
+            "help": "多语言模型的路径，使用需要包含{lang}format模板"
+        }
+    )
+
+    multi_lang_loss_type: Literal["","self","hard_negative"] = field(
+        default="")
 
 
 @dataclass

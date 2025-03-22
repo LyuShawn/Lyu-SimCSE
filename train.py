@@ -118,7 +118,6 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
-
     # 加载模型
     logger.info("********* Load Model *********")
     if model_args.model_name_or_path:
@@ -153,15 +152,18 @@ def main():
     # 更新tokenizer的词表大小
     model.resize_token_embeddings(len(tokenizer))
 
-
-
     # 数据tokenize
     column_names = datasets["train"].column_names
     sent2_cname = None
     if len(column_names) == 2:
         # 两个句子的数据集
-        sent0_cname = column_names[0]
-        sent1_cname = column_names[1]
+        if model_args.multi_lang:
+            # (lang, text)
+            sent0_cname = column_names[1]
+            sent1_cname = column_names[1]
+        else:
+            sent0_cname = column_names[0]
+            sent1_cname = column_names[1]
     elif len(column_names) == 3:
         # 三个句子的数据集
         sent0_cname = column_names[0]

@@ -68,6 +68,9 @@ class OurDataCollatorWithPadding:
         if features[0].get('category_input_ids', None) is not None:
             batch['category_input_ids'] = [f['category_input_ids'] for f in flat_features]
 
+        if features[0].get('lang_label', None) is not None:
+            batch['lang_label'] = [f['lang_label'] for f in flat_features]
+
         if has_sent_knowledge:
             batch['sent_knowledge'] = {'input_ids': sent_knowledge_input_ids, 'attention_mask': sent_knowledge_attention_mask}
 

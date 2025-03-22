@@ -190,4 +190,7 @@ def prepare_features(examples, args:PrepareFeaturesArgs):
             start += num
         features['category_input_ids'] = category_feature_input_ids
 
+    if model_args.multi_lang:
+        features['lang_label'] = examples['lang']
+
     return features

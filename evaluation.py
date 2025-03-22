@@ -426,7 +426,7 @@ class EvaluationUtil:
 
         dataset_tokenize = dataset.map(sent_tokenize, 
                                     batched=True,
-                                    load_from_cache_file=False)
+                                    load_from_cache_file=True)
 
         cos_sim_list = []
         # 按照batch_size处理数据
