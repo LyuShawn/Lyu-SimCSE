@@ -416,12 +416,12 @@ class EvaluationUtil:
         return params
 
     @classmethod
-    def eval_by_dataset_core(cls, model, tokenizer,dataset, sent1_name, sent2_name, label_name, bs=64, metric="spearman"):
+    def eval_by_dataset_core(cls, model, tokenizer,dataset, sent1_name, sent2_name, label_name, bs=64, metric="spearman",pooler_type='cls'):
         """评估核心，与senteval不同的是，这里是自己控制数据集
         评估由自己写
         """
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        pooler = Pooler("cls").to(device)
+        pooler = Pooler(pooler_type).to(device)
 
         model.to(device)
 
@@ -554,7 +554,7 @@ class EvaluationUtil:
             return result_list
 
     @classmethod
-    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=256,metric="spearman", use_mteb=False):
+    def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=256,metric="spearman", use_mteb=False,pooler_type='cls'):
         """自己控制数据集"""
 
         if use_mteb:
@@ -598,6 +598,7 @@ class EvaluationUtil:
             sent1_name = "text_1"
             sent2_name = "text_2"
             label_name = "label"
+            metric = "accuracy"
 
         elif "FinSTS" in dataset_name:
             if mode == "test":
@@ -614,7 +615,7 @@ class EvaluationUtil:
             raise NotImplementedError
 
         # 按照batch_size处理数据
-        return cls.eval_by_dataset_core(model,tokenizer , dataset, sent1_name, sent2_name, label_name, bs=bs, metric=metric)
+        return cls.eval_by_dataset_core(model,tokenizer , dataset, sent1_name, sent2_name, label_name, bs=bs, metric=metric,pooler_type=pooler_type)
 
         
 
@@ -631,7 +632,7 @@ def main():
     with open(output_file, 'w') as f:
         json.dump(result, f, indent=4)
     print(f"Result has been saved to {output_file}")
-    print(f"avg:{result['avg']}")
+    # print(f"avg:{result['avg']}")
 
 
 if __name__ == "__main__":
