@@ -21,6 +21,8 @@ from loader.collator import OurDataCollatorWithPadding
 from arguments import (ModelArguments, DataTrainingArguments, OurTrainingArguments)
 import wandb
 import torch
+import json
+from evaluation import CustomMtebModel
 
 logger = logging.getLogger(__name__)
 
@@ -271,18 +273,38 @@ def main():
 
     # Evaluation
     results = {}
-    if training_args.do_eval:
+    # if training_args.do_eval:
 
-        logger.info(f"*** Evaluate ***")
-        eval_util = EvaluationUtil(path = training_args.output_dir, 
-                                model_args = model_args, 
-                                print_table=True, 
-                                dataset=eval_dataset, 
-                                dataset_name=training_args.eval_dataset,
-                                metric=training_args.metric_for_best_model,)
-        results, result_file_path = eval_util.eval()
-        wandb.log(results)
-        wandb.log({"score_file": wandb.save(result_file_path)})
+    #     logger.info(f"*** Evaluate ***")
+    #     eval_util = EvaluationUtil(path = training_args.output_dir, 
+    #                             model_args = model_args, 
+    #                             print_table=True, 
+    #                             dataset=eval_dataset, 
+    #                             dataset_name=training_args.eval_dataset,
+    #                             metric=training_args.metric_for_best_model,)
+    #     results, result_file_path = eval_util.eval()
+    #     wandb.log(results)
+    #     wandb.log({"score_file": wandb.save(result_file_path)})
+
+    if training_args.eval_multi_task:
+        logger.info(f"*** Evaluate Multi Task ***")
+        eval_set = ["BUCC.v2","Tatoeba.14"]
+        # eval_set = ["PawsXPairClassification","TNews"]
+        model = CustomMtebModel(model_name=training_args.output_dir)
+        multi_eval_results = {}
+
+        for task in eval_set:
+            logger.info(f"*** Evaluate {task} ***")
+            eval_result = EvaluationUtil.eval_by_mteb(task_name=[task], model=model, bs=128)
+            multi_eval_results[task] = eval_result
+        wandb.log(multi_eval_results)
+        logger.info(f"*** Multi Eval Results : {multi_eval_results} ***")
+        output_file = os.path.join(training_args.output_dir, "multi_eval_results.json")
+        with open(output_file, 'w') as f:
+            json.dump(multi_eval_results, f, indent=4)
+        wandb.log({"multi_eval_results": wandb.save(output_file)})
+        logger.info(f"*** Save Multi Eval Results : {output_file} ***")
+
 
     logger.info("********* Finish *********")
     wandb.finish()

@@ -26,7 +26,7 @@
             "args": [
                 "--output_dir", "result/debug", "--debug_mode",
                 "--preprocessing_num_workers", "4",
-                "--do_train", 
+                // "--do_train", 
                 "--do_eval",
                 "--train_file","wiki1m_multi_lang.csv",
                 "--multi_lang",
@@ -37,6 +37,7 @@
                 "--eval_dataset", "mteb/stsb_multi_mt",
                 "--eval_dataset_name", "default",
                 "--multi_lang_loss_type","add",
+                "--eval_multi_task",
                 // "--mteb",
                 "--metric_for_best_model", "spearman",
                 // "--do_prompt_enhancement",

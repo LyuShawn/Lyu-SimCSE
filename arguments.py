@@ -449,7 +449,7 @@ class OurTrainingArguments(TrainingArguments):
 
 
     save_total_limit: Optional[int] = field(
-        default=5,
+        default=2,
         metadata={"help": "Limit the total amount of checkpoints."}
     )
 
@@ -491,6 +491,11 @@ class OurTrainingArguments(TrainingArguments):
     mteb: bool = field(
         default=False,
         metadata={"help": "Whether to use mteb."},
+    )
+
+    eval_multi_task: bool = field(
+        default=False,
+        metadata={"help": "Whether to use multi task."},
     )
 
     # 设置torch
