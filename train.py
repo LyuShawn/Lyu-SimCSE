@@ -288,7 +288,7 @@ def main():
 
     if training_args.eval_multi_task:
         logger.info(f"*** Evaluate Multi Task ***")
-        eval_set = ["BUCC.v2","Tatoeba.14"]
+        eval_set = ["BUCC.v2","Tatoeba.14","Tatoeba.36","Tatoeba"]
         # eval_set = ["PawsXPairClassification","TNews"]
         model = CustomMtebModel(model_name=training_args.output_dir)
         multi_eval_results = {}
