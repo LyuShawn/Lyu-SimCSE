@@ -373,7 +373,7 @@ def cl_forward(cls,
 
         if cls.model_args.multi_lang_loss_type == "self":
             z2 = teacher_output
-        elif cls.model_args.multi_lang_loss_type == "hard":
+        elif cls.model_args.multi_lang_loss_type == "hard_negative":
             # Hard negative
             z3 = teacher_output
         elif cls.model_args.multi_lang_loss_type == "add":
@@ -381,7 +381,7 @@ def cl_forward(cls,
 
     cos_sim = cls.sim(z1.unsqueeze(1), z2.unsqueeze(0))
     
-    if cls.model_args.multi_lang_loss_type == "hard":
+    if cls.model_args.multi_lang_loss_type == "hard_negative":
         z1_z3_cos = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
         cos_sim = torch.cat([cos_sim, z1_z3_cos], 1)
 
