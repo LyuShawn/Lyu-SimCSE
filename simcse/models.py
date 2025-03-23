@@ -65,7 +65,7 @@ class MultiLangTeacher(nn.Module):
         self.teacher_models = teacher_models
         # self.teacher_tokenizers = teacher_tokenizers
 
-    def forward(self, input_ids, attention_mask, lang_label):
+    def forward(self, input_ids, attention_mask, lang_label,student_output=None):
         # input_ids: (bs, len)
         # lang_label: (bs, )
         batch_size = input_ids.size(0)
@@ -81,11 +81,13 @@ class MultiLangTeacher(nn.Module):
                 lang_attention_mask = attention_mask[indices]
                 # Check that the language is in the allowed list
                 if lang not in self.lang_list:  
-                    lang = self.lang_list[0]  # Default to the first language
-
-                output = self.teacher_models[lang](input_ids=lang_input_ids, attention_mask=lang_attention_mask, return_dict=True)
-                pooler_output = self.pooler(lang_attention_mask, output, lang_input_ids)
-                assert pooler_output.shape == (len(indices), self.teacher_models[lang].config.hidden_size)
+                    # If the language is not in the list, use the student's output
+                    assert student_output is not None
+                    pooler_output = student_output[indices]
+                else:
+                    output = self.teacher_models[lang](input_ids=lang_input_ids, attention_mask=lang_attention_mask, return_dict=True)
+                    pooler_output = self.pooler(lang_attention_mask, output, lang_input_ids)
+                    assert pooler_output.shape == (len(indices), self.teacher_models[lang].config.hidden_size)
 
                 for i, idx in enumerate(indices):
                     teacher_outputs[idx] = pooler_output[i]
@@ -368,7 +370,7 @@ def cl_forward(cls,
         attention_mask = attention_mask.view((batch_size, num_sent, attention_mask.size(-1)))[:,0]
         # label取奇数
         lang_label = lang_label[::2]
-        teacher_output = cls.teacher(input_ids,attention_mask,lang_label)
+        teacher_output = cls.teacher(input_ids,attention_mask,lang_label,student_output=z1)
         assert teacher_output.shape == (batch_size, hidden_dim)
 
         if cls.model_args.multi_lang_loss_type == "self":
