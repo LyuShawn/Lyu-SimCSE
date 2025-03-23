@@ -389,7 +389,7 @@ def cl_forward(cls,
     loss_fct = nn.CrossEntropyLoss()
 
     # Calculate loss with hard negatives
-    if cls.model_args.multi_lang_loss_type == "hard":
+    if cls.model_args.multi_lang_loss_type == "hard_negative":
         # Note that weights are actually logits of weights
         z3_weight = cls.model_args.hard_negative_weight
         weights = torch.tensor(
