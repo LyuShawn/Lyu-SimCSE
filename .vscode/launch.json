@@ -36,7 +36,7 @@
                 "--lang_model_dir","result/e102_{lang}_bert_base_m/",
                 "--eval_dataset", "mteb/stsb_multi_mt",
                 "--eval_dataset_name", "default",
-                "--multi_lang_loss_type","hard_negative",
+                "--multi_lang_loss_type","add",
                 // "--mteb",
                 "--metric_for_best_model", "spearman",
                 // "--do_prompt_enhancement",

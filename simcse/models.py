@@ -376,6 +376,8 @@ def cl_forward(cls,
         elif cls.model_args.multi_lang_loss_type == "hard":
             # Hard negative
             z3 = teacher_output
+        elif cls.model_args.multi_lang_loss_type == "add":
+            z3 = teacher_output
 
     cos_sim = cls.sim(z1.unsqueeze(1), z2.unsqueeze(0))
     
@@ -396,6 +398,10 @@ def cl_forward(cls,
         cos_sim = cos_sim + weights
 
     loss = loss_fct(cos_sim, labels)
+
+    if cls.model_args.multi_lang_loss_type == "add":
+        cos_sim = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
+        loss += loss_fct(cos_sim, labels) * cls.model_args.multi_lang_loss_weight
 
     if cls.model_args.knowledge_loss_type:
         if cls.model_args.knowledge_loss_type == "info_nce":
