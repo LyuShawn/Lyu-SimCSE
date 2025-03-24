@@ -16,6 +16,7 @@ import random
 from mteb.encoder_interface import PromptType
 from typing import Optional
 import mteb
+import string
 from mteb.task_selection import results_to_dataframe
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
