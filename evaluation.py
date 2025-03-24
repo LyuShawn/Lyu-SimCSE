@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
 from tqdm import tqdm
+import random
 from mteb.encoder_interface import PromptType
 from typing import Optional
 import mteb

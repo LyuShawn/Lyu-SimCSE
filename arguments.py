@@ -168,6 +168,13 @@ class ModelArguments:
         }
     )
 
+    prompt_l2_loss: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use prompt l2 loss."
+        }
+    )
+
     knowledge_fusion_type: Literal["","full","self_positive","knowledge_positive"] = field(
         default="",
         metadata={
