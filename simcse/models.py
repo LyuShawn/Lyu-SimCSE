@@ -402,6 +402,7 @@ def cl_forward(cls,
         ).to(cls.device)
         cos_sim = cos_sim + weights
 
+
     loss = loss_fct(cos_sim, labels)
 
     if cls.model_args.multi_lang_loss_type == "add":

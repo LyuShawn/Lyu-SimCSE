@@ -476,7 +476,7 @@ class EvaluationUtil:
                         return_dict=True,)
 
             # (bs*2, hidden_size)
-            pooler_output = pooler(attention_mask=attention_mask, outputs=outputs, input_ids=input_ids, mask_token_id=tokenizer.mask_token_id, use_pooler_output=True)
+            pooler_output = pooler(attention_mask=attention_mask, outputs=outputs, input_ids=input_ids, mask_token_id=tokenizer.mask_token_id, use_pooler_output=False)
             pooler_output = pooler_output.view(-1, 2, pooler_output.size(-1)) # (bs, 2, hidden_size)
 
             z1 = pooler_output[:, 0]    # (bs, hidden_size)
@@ -526,7 +526,10 @@ class EvaluationUtil:
             evaluation = mteb.MTEB(tasks=tasks)
             results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": 128})
             result_list = [result.to_dict() for result in results]
-            return result_list[0]['scores'][mode]
+            result = result_list[0]['scores'][mode]
+            avg = sum(r['main_score'] for r in result)/len(result)
+            return {'avg': avg, 'result':result}
+            # return result_list[0]['scores'][mode]
 
         elif task_name[0].startswith("Tatoeba"):
             lang_list = None
