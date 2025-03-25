@@ -296,7 +296,7 @@ class ModelArguments:
         }
     )
 
-    multi_lang_loss_type: Literal["","self","hard_negative","add"] = field(
+    multi_lang_loss_type: Literal["","self","hard_negative","add","self_hard_negative"] = field(
         default="")
 
     multi_lang_loss_weight: float = field(
