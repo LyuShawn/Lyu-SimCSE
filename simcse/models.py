@@ -380,10 +380,13 @@ def cl_forward(cls,
             z3 = teacher_output
         elif cls.model_args.multi_lang_loss_type == "add":
             z3 = teacher_output
+        elif cls.model_args.multi_lang_loss_type == "self_hard_negative":
+            z3 = z2
+            z2 = teacher_output
 
     cos_sim = cls.sim(z1.unsqueeze(1), z2.unsqueeze(0))
     
-    if cls.model_args.multi_lang_loss_type == "hard_negative":
+    if "hard_negative" in cls.model_args.multi_lang_loss_type:
         z1_z3_cos = cls.sim(z1.unsqueeze(1), z3.unsqueeze(0))
         cos_sim = torch.cat([cos_sim, z1_z3_cos], 1)
 
@@ -391,7 +394,7 @@ def cl_forward(cls,
     loss_fct = nn.CrossEntropyLoss()
 
     # Calculate loss with hard negatives
-    if cls.model_args.multi_lang_loss_type == "hard_negative":
+    if "hard_negative" in cls.model_args.multi_lang_loss_type:
         # Note that weights are actually logits of weights
         z3_weight = cls.model_args.hard_negative_weight
         weights = torch.tensor(
