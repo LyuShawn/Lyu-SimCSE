@@ -3,6 +3,12 @@ from utils.sentence_util import text_encode
 import json
 from utils.cache_util import disk_cache
 from utils.sentence_util import text_md5
+import random
+import string
+import nltk
+nltk.download('words')
+from nltk.corpus import words
+word_list = words.words()
 
 def retrieval_knowledge_title(sent_list):
     """搜索句子对应的知识标题"""
@@ -70,7 +76,7 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         查询知识
     """
 
-    type_list = ["title","summary","empty","sentence","rewrite","random"]
+    type_list = ["title","summary","empty","sentence","rewrite","random","random_char","random_word","unknown"]
     assert retrieve_type in type_list, f"retrieve_type must in {type_list}"
 
     result = []
@@ -116,6 +122,23 @@ def retrieval_knowledge(sent_list, retrieve_type = 'title', max_length = -1):
         return result
     elif retrieve_type=="rewrite":
         return sent_list
+
+    elif retrieve_type=="unknown":
+        return ["unknown"]*len(sent_list)
+    elif retrieve_type=="random_char":
+        # 随机生成随机数量的字符
+        result = []
+        for sent in sent_list:
+            k = random.randint(1,32)
+            result.append(''.join(random.choices(string.ascii_letters, k=k)))
+        return result
+    elif retrieve_type=="random_word":
+        # 随机选择随机数量的词
+        result = []
+        for sent in sent_list:
+            length = random.randint(1,32)
+            result.append(" ".join(random.sample(word_list,length)))
+        return result
     else:
         raise NotImplementedError
 
