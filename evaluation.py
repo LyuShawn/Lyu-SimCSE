@@ -556,7 +556,9 @@ class EvaluationUtil:
             evaluation = mteb.MTEB(tasks=tasks)
             results = evaluation.run(model,overwrite_results=True,encode_kwargs={"batch_size": bs})
             result_list = [result.to_dict() for result in results]
-            return result_list
+            result = result_list[0]['scores'][mode]
+            avg = sum(r['main_score'] for r in result)/len(result)
+            return {'avg': avg, 'result':result, 'detail':result_list}
 
     @classmethod
     def eval_by_dataset(cls, model,tokenizer,dataset, dataset_name, mode, bs=256,metric="spearman", use_mteb=False,pooler_type='cls'):
